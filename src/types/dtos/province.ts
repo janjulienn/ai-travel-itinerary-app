@@ -8,7 +8,7 @@ export interface IPlaceHighlight {
 }
 
 export interface IPlace {
-  id: number;
+  google_place_id: string;
   name: string;
   category: 'attraction' | 'activity' | 'restaurant' | 'food_trip' | 'accommodation' | 'landmark' | 'nature' | 'beach';
   category_display: string;
@@ -16,7 +16,6 @@ export interface IPlace {
   address: string | null;
   latitude: number | null;
   longitude: number | null;
-  google_place_id: string | null;
   google_maps_url: string | null;
   rating: number | null;
   total_ratings: number | null;
@@ -26,7 +25,13 @@ export interface IPlace {
   photos: string[] | null;
   tags: string[] | null;
   typical_duration_minutes: number | null;
-  highlights: IPlaceHighlight[];
+  highlights?: IPlaceHighlight[];
+}
+
+export interface ITopPlacesCategoryGroup {
+  category: IPlace['category'];
+  category_display: string;
+  places: IPlace[];
 }
 
 export interface IProvinceList {
@@ -42,5 +47,5 @@ export interface IProvinceList {
 }
 
 export interface IProvinceDetail extends IProvinceList {
-  top_places: IPlace[];
+  top_places_by_category: ITopPlacesCategoryGroup[];
 }

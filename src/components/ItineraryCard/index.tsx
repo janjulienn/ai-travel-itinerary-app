@@ -22,6 +22,11 @@ export const ItineraryCard: React.FC<ItineraryCardProps> = ({
 }) => {
   const theme = useTheme();
   const statusConfig = STATUS_CONFIG[itinerary.status];
+  const displayTitle = itinerary.title?.trim()
+    ? itinerary.title
+    : itinerary.status === 'generating'
+      ? 'Building your itinerary...'
+      : 'Untitled itinerary';
 
   const handleDeletePress = (event: GestureResponderEvent) => {
     event.stopPropagation();
@@ -35,9 +40,10 @@ export const ItineraryCard: React.FC<ItineraryCardProps> = ({
           <View style={styles.header}>
             <View style={styles.titleContainer}>
               <Text variant="titleLarge" style={styles.title}>
-                {itinerary.title}
+                {displayTitle}
               </Text>
               <View style={styles.actionsContainer}>
+                {itinerary.has_unseen_update && <View style={[styles.updateDot, { backgroundColor: '#03A9F4' }]} />}
                 <Chip
                   icon={statusConfig.icon}
                   style={[styles.statusChip, { backgroundColor: statusConfig.color + '20' }]}
@@ -111,6 +117,12 @@ const styles = StyleSheet.create({
   },
   statusChip: {
     height: 28,
+  },
+  updateDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
   },
   deleteButton: {
     margin: 0,

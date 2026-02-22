@@ -1,7 +1,7 @@
 // Place search bottom sheet component for adding/replacing activities
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { View, StyleSheet, ScrollView, useWindowDimensions, Alert, Linking, Pressable, Image } from 'react-native';
 import {
   Portal,
   Modal,
@@ -12,7 +12,6 @@ import {
   Button,
   ActivityIndicator,
   useTheme,
-  TextInput,
   IconButton,
 } from 'react-native-paper';
 import { TimePickerModal } from 'react-native-paper-dates';
@@ -20,7 +19,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { provincesApi } from '../../services/api/provinces';
 import type { IPlace } from '../../types/dtos/province';
 import type { IItineraryActivity } from '../../types/dtos/itinerary';
-import { PlaceDetailModal } from '../PlaceDetailModal';
+import { PhotoViewerModal } from '../PhotoViewerModal';
 
 interface PlaceSearchBottomSheetProps {
   visible: boolean;
@@ -35,6 +34,29 @@ interface PlaceSearchBottomSheetProps {
   provinceName?: string;
   mode: 'add' | 'replace';
   activityToReplace?: IItineraryActivity | null;
+  initialAddTimeStart?: string;
+  initialAddTimeEnd?: string;
+  previousActivity?: {
+    id: number;
+    title: string;
+    time_start: string;
+    time_end: string;
+    latitude: number | null;
+    longitude: number | null;
+  };
+  nextActivity?: {
+    id: number;
+    title: string;
+    time_start: string;
+    time_end: string;
+    latitude: number | null;
+    longitude: number | null;
+  };
+}
+
+interface IReferencePoint {
+  latitude: number;
+  longitude: number;
 }
 
 const CATEGORIES = [
@@ -83,6 +105,31 @@ const formatTo12Hour = (hours: number, minutes: number): string => {
   return `${String(displayHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
 };
 
+const toRadians = (value: number): number => (value * Math.PI) / 180;
+
+const haversineDistanceKm = (
+  fromLatitude: number,
+  fromLongitude: number,
+  toLatitude: number,
+  toLongitude: number
+): number => {
+  const earthRadiusKm = 6371;
+  const dLat = toRadians(toLatitude - fromLatitude);
+  const dLon = toRadians(toLongitude - fromLongitude);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(fromLatitude)) *
+      Math.cos(toRadians(toLatitude)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusKm * c;
+};
+
+const hasCoordinate = (value: number | null | undefined): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
 export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
   visible,
   onDismiss,
@@ -91,6 +138,10 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
   provinceName,
   mode,
   activityToReplace,
+  initialAddTimeStart,
+  initialAddTimeEnd,
+  previousActivity,
+  nextActivity,
 }) => {
   const theme = useTheme();
   const { height: windowHeight } = useWindowDimensions();
@@ -99,10 +150,13 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
   const [places, setPlaces] = useState<IPlace[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<IPlace | null>(null);
-  const [placeDetailVisible, setPlaceDetailVisible] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [buttonHeight, setButtonHeight] = useState(0);
   const [selectedContentHeight, setSelectedContentHeight] = useState(0);
+  const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const [showMoreDetails, setShowMoreDetails] = useState(false);
+  const [showInsertPreview, setShowInsertPreview] = useState(false);
   
   // Time picker state
   const [startTimePickerVisible, setStartTimePickerVisible] = useState(false);
@@ -112,15 +166,114 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
   const [timeStart, setTimeStart] = useState({ hours: 9, minutes: 0 });
   const [timeEnd, setTimeEnd] = useState({ hours: 10, minutes: 0 });
   const [duration, setDuration] = useState(60);
+  const requestSeqRef = useRef(0);
+
+  const referencePoint = useMemo<IReferencePoint | null>(() => {
+    if (mode === 'replace') {
+      const latitude = activityToReplace?.place_detail?.latitude;
+      const longitude = activityToReplace?.place_detail?.longitude;
+
+      if (hasCoordinate(latitude) && hasCoordinate(longitude)) {
+        return { latitude, longitude };
+      }
+
+      return null;
+    }
+
+    const previousHasCoordinates =
+      hasCoordinate(previousActivity?.latitude) && hasCoordinate(previousActivity?.longitude);
+    const nextHasCoordinates = hasCoordinate(nextActivity?.latitude) && hasCoordinate(nextActivity?.longitude);
+
+    if (previousHasCoordinates && nextHasCoordinates) {
+      return {
+        latitude: ((previousActivity?.latitude as number) + (nextActivity?.latitude as number)) / 2,
+        longitude: ((previousActivity?.longitude as number) + (nextActivity?.longitude as number)) / 2,
+      };
+    }
+
+    if (previousHasCoordinates) {
+      return {
+        latitude: previousActivity?.latitude as number,
+        longitude: previousActivity?.longitude as number,
+      };
+    }
+
+    if (nextHasCoordinates) {
+      return {
+        latitude: nextActivity?.latitude as number,
+        longitude: nextActivity?.longitude as number,
+      };
+    }
+
+    return null;
+  }, [mode, activityToReplace, previousActivity, nextActivity]);
+
+  const proximityHintText = useMemo(() => {
+    if (!referencePoint) {
+      return null;
+    }
+
+    if (mode === 'replace') {
+      return 'Suggested places are sorted by nearest location to the activity being replaced.';
+    }
+
+    return 'Suggested places are sorted by nearest location to nearby activities in this day.';
+  }, [mode, referencePoint]);
+
+  const fetchPlaces = useCallback(
+    async (query?: string) => {
+      requestSeqRef.current += 1;
+      const requestSeq = requestSeqRef.current;
+
+      try {
+        setLoading(true);
+
+        const normalizedQuery = (query || '').trim();
+        let data: IPlace[] = [];
+
+        if (normalizedQuery.length >= 2) {
+          if (selectedCategories.length === 1) {
+            data = await provincesApi.autocompleteProvincePlaces(provinceSlug, {
+              q: normalizedQuery,
+              category: selectedCategories[0],
+            });
+          } else {
+            data = await provincesApi.autocompleteProvincePlaces(provinceSlug, {
+              q: normalizedQuery,
+            });
+          }
+        } else if (selectedCategories.length === 1) {
+          data = await provincesApi.getProvincePlaces(provinceSlug, {
+            category: selectedCategories[0],
+          });
+        } else {
+          data = await provincesApi.getProvincePlaces(provinceSlug);
+        }
+
+        if (requestSeq === requestSeqRef.current) {
+          setPlaces(data);
+        }
+      } catch (error) {
+        if (requestSeq === requestSeqRef.current) {
+          console.error('Error fetching places:', error);
+        }
+      } finally {
+        if (requestSeq === requestSeqRef.current) {
+          setLoading(false);
+        }
+      }
+    },
+    [provinceSlug, selectedCategories]
+  );
 
   useEffect(() => {
     if (visible) {
-      fetchPlaces();
       // Reset state when opening
       setSearchQuery('');
       setSelectedCategories([]);
       setSelectedPlace(null);
-      setPlaceDetailVisible(false);
+      setShowMoreDetails(false);
+      setShowInsertPreview(false);
       
       // Pre-fill times if replacing activity
       if (mode === 'replace' && activityToReplace) {
@@ -129,13 +282,31 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
         setTimeStart(start);
         setTimeEnd(end);
         setDuration(activityToReplace.duration_minutes);
+      } else if (mode === 'add' && initialAddTimeStart && initialAddTimeEnd) {
+        const start = parseTime(initialAddTimeStart);
+        const end = parseTime(initialAddTimeEnd);
+        setTimeStart(start);
+        setTimeEnd(end);
+        setDuration(60);
       } else {
         setTimeStart({ hours: 9, minutes: 0 });
         setTimeEnd({ hours: 10, minutes: 0 });
         setDuration(60);
       }
     }
-  }, [visible, provinceSlug, mode, activityToReplace]);
+  }, [visible, provinceSlug, mode, activityToReplace, initialAddTimeStart, initialAddTimeEnd]);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      fetchPlaces(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [visible, searchQuery, selectedCategories, fetchPlaces]);
 
   useEffect(() => {
     // Calculate duration when times change
@@ -145,18 +316,6 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
       setDuration(endMinutes - startMinutes);
     }
   }, [timeStart, timeEnd]);
-
-  const fetchPlaces = async () => {
-    try {
-      setLoading(true);
-      const data = await provincesApi.getProvincePlaces(provinceSlug);
-      setPlaces(data);
-    } catch (error) {
-      console.error('Error fetching places:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Filter places based on search and category
   const filteredPlaces = useMemo(() => {
@@ -173,8 +332,55 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
       filtered = filtered.filter((place) => selectedCategories.includes(place.category));
     }
 
+    const seenPlaceIds = new Set<string>();
+    filtered = filtered.filter((place) => {
+      const placeId = place.google_place_id;
+      if (!placeId) {
+        return true;
+      }
+      if (seenPlaceIds.has(placeId)) {
+        return false;
+      }
+      seenPlaceIds.add(placeId);
+      return true;
+    });
+
+    if (referencePoint) {
+      filtered = [...filtered].sort((first, second) => {
+        const firstHasCoordinates = hasCoordinate(first.latitude) && hasCoordinate(first.longitude);
+        const secondHasCoordinates = hasCoordinate(second.latitude) && hasCoordinate(second.longitude);
+
+        if (!firstHasCoordinates && !secondHasCoordinates) {
+          return 0;
+        }
+
+        if (!firstHasCoordinates) {
+          return 1;
+        }
+
+        if (!secondHasCoordinates) {
+          return -1;
+        }
+
+        const firstDistance = haversineDistanceKm(
+          referencePoint.latitude,
+          referencePoint.longitude,
+          first.latitude as number,
+          first.longitude as number
+        );
+        const secondDistance = haversineDistanceKm(
+          referencePoint.latitude,
+          referencePoint.longitude,
+          second.latitude as number,
+          second.longitude as number
+        );
+
+        return firstDistance - secondDistance;
+      });
+    }
+
     return filtered;
-  }, [places, searchQuery, selectedCategories]);
+  }, [places, searchQuery, selectedCategories, referencePoint]);
 
   const handleSelectPlace = (place: IPlace) => {
     setSelectedPlace(place);
@@ -218,16 +424,26 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
     );
   };
 
+  const openGoogleMaps = (url: string | null | undefined) => {
+    if (!url) {
+      return;
+    }
+
+    Linking.openURL(url).catch((error) => {
+      console.error('Failed to open Google Maps:', error);
+    });
+  };
+
+  const openPhotoViewer = (index: number) => {
+    setSelectedPhotoIndex(index);
+    setPhotoViewerVisible(true);
+  };
+
   const modalMaxHeight = windowHeight * 0.9;
   const browseModalHeight = windowHeight * 0.78;
-  const selectedTotalHeight = headerHeight + buttonHeight + selectedContentHeight;
-  const selectedNeedsScroll = selectedTotalHeight > modalMaxHeight;
-  const selectedModalHeight =
-    selectedPlace && headerHeight > 0 && buttonHeight > 0 && selectedContentHeight > 0
-      ? Math.min(selectedTotalHeight, modalMaxHeight)
-      : undefined;
+  const selectedModalHeight = windowHeight * 0.84;
   const currentModalHeight = selectedPlace
-    ? selectedModalHeight ?? modalMaxHeight
+    ? Math.min(selectedModalHeight, modalMaxHeight)
     : Math.min(browseModalHeight, modalMaxHeight);
 
   return (
@@ -245,9 +461,16 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
           ]}
         >
           <View style={styles.header} onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
-            <Text variant="headlineSmall" style={styles.title}>
-              {mode === 'add' ? 'Add Activity' : 'Replace Activity'}
-            </Text>
+            <View style={styles.headerTextContainer}>
+              <Text variant="headlineSmall" style={styles.title}>
+                {mode === 'add' ? 'Add Activity' : 'Replace Activity'}
+              </Text>
+              {mode === 'add' ? (
+                <Text variant="bodySmall" style={styles.scopeText}>
+                  {provinceName || provinceSlug}
+                </Text>
+              ) : null}
+            </View>
             <IconButton icon="close" size={24} onPress={onDismiss} />
           </View>
 
@@ -297,6 +520,12 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                     </Chip>
                   ))}
                 </View>
+
+                {proximityHintText && (
+                  <Text variant="bodySmall" style={styles.proximityHintText}>
+                    {proximityHintText}
+                  </Text>
+                )}
               </View>
 
               {loading ? (
@@ -306,11 +535,30 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                 </View>
               ) : (
                 <View style={styles.placesListContainer}>
-                  {filteredPlaces.map((item) => (
+                  {filteredPlaces.map((item, index) => (
                     <List.Item
-                      key={item.id}
+                      key={item.google_place_id || `${item.name}-${index}`}
                       title={item.name}
-                      description={item.category_display}
+                      description={() => (
+                        <View style={styles.placeDescriptionContainer}>
+                          <Text
+                            variant="bodySmall"
+                            style={styles.placeAddressText}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                          >
+                            {item.address || 'Address not available'}
+                          </Text>
+                          <Text variant="bodyMedium" style={styles.placeCategoryText}>
+                            {item.category_display}
+                          </Text>
+                          {referencePoint && (
+                            <Text variant="labelSmall" style={styles.nearestBadgeText}>
+                              Nearest to timeline context
+                            </Text>
+                          )}
+                        </View>
+                      )}
                       left={() => (
                         <MaterialCommunityIcons
                           name={getCategoryIcon(item.category) as any}
@@ -328,6 +576,12 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                         ) : null
                       }
                       onPress={() => handleSelectPlace(item)}
+                      onLongPress={() =>
+                        Alert.alert(
+                          item.name,
+                          item.address || 'Address not available'
+                        )
+                      }
                       style={styles.placeItem}
                     />
                   ))}
@@ -346,9 +600,51 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
               style={styles.content}
               contentContainerStyle={styles.selectedContentContainer}
               showsVerticalScrollIndicator={false}
-              scrollEnabled={selectedNeedsScroll}
+              scrollEnabled
               onContentSizeChange={(_, height) => setSelectedContentHeight(height)}
             >
+              <View style={styles.selectionSummaryCard}>
+                {mode === 'replace' ? (
+                  <>
+                    <Text variant="labelLarge" style={styles.selectionSummaryTitle}>
+                      Replacing activity
+                    </Text>
+                    {activityToReplace?.place_detail?.google_maps_url ? (
+                      <Pressable onPress={() => openGoogleMaps(activityToReplace.place_detail?.google_maps_url)}>
+                        <Text variant="bodyMedium" style={styles.selectionFromLink} numberOfLines={2}>
+                          {activityToReplace.location_name || activityToReplace.title}
+                        </Text>
+                      </Pressable>
+                    ) : (
+                      <Text variant="bodyMedium" style={styles.selectionFromText} numberOfLines={2}>
+                        {activityToReplace?.location_name || activityToReplace?.title || 'Current activity'}
+                      </Text>
+                    )}
+
+                    <View style={styles.selectionArrowRow}>
+                      <MaterialCommunityIcons name="swap-vertical" size={16} color={theme.colors.primary} />
+                    </View>
+                    <Text variant="bodyMedium" style={styles.selectionToText} numberOfLines={2}>
+                      {selectedPlace.name}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text variant="labelLarge" style={styles.selectionSummaryTitle}>
+                      Adding activity
+                    </Text>
+                    <Text variant="bodyMedium" style={styles.selectionToText} numberOfLines={2}>
+                      {selectedPlace.name}
+                    </Text>
+                    {!!selectedPlace.address && (
+                      <Text variant="bodySmall" style={styles.selectionSummaryAddress} numberOfLines={2}>
+                        {selectedPlace.address}
+                      </Text>
+                    )}
+                  </>
+                )}
+              </View>
+
               <View style={styles.selectedPlace}>
                 <MaterialCommunityIcons
                   name={getCategoryIcon(selectedPlace.category) as any}
@@ -360,12 +656,6 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                     <Text variant="titleMedium" style={styles.selectedPlaceName}>
                       {selectedPlace.name}
                     </Text>
-                    <IconButton
-                      icon="information"
-                      size={20}
-                      onPress={() => setPlaceDetailVisible(true)}
-                      style={styles.infoButton}
-                    />
                   </View>
                   <Text variant="bodyMedium" style={styles.selectedPlaceCategory}>
                     {selectedPlace.category_display}
@@ -373,9 +663,133 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                 </View>
               </View>
 
+              <Button
+                mode="text"
+                onPress={() => setShowMoreDetails((previous) => !previous)}
+                icon={showMoreDetails ? 'chevron-up' : 'chevron-down'}
+                compact
+                style={styles.moreDetailsToggle}
+              >
+                {showMoreDetails ? 'Hide details' : 'Show more details'}
+              </Button>
+
+              {showMoreDetails && (
+                <View style={styles.inlineDetailsSection}>
+                  <View style={styles.badgesRow}>
+                    <Chip icon="tag" style={styles.detailChip} compact>
+                      {selectedPlace.category_display}
+                    </Chip>
+                    {selectedPlace.rating != null && typeof selectedPlace.rating === 'number' && (
+                      <Chip icon="star" style={styles.detailChip} compact>
+                        {selectedPlace.rating.toFixed(1)} ({selectedPlace.total_ratings || 0})
+                      </Chip>
+                    )}
+                    {selectedPlace.price_level !== null && (
+                      <Chip icon="cash" style={styles.detailChip} compact>
+                        {selectedPlace.price_level_display}
+                      </Chip>
+                    )}
+                  </View>
+
+                  {!!selectedPlace.description && (
+                    <Text variant="bodySmall" style={styles.selectedPlaceDescription}>
+                      {selectedPlace.description}
+                    </Text>
+                  )}
+
+                  {!!selectedPlace.photos?.length && (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.photosContainer}
+                      contentContainerStyle={styles.photosContent}
+                    >
+                      {selectedPlace.photos.map((photo, index) => (
+                        <Pressable key={`${selectedPlace.google_place_id}-photo-${index}`} onPress={() => openPhotoViewer(index)}>
+                          <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" />
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  )}
+
+                  {!!selectedPlace.address && (
+                    <Text variant="bodySmall" style={styles.selectedPlaceAddress}>
+                      {selectedPlace.address}
+                    </Text>
+                  )}
+
+                  {selectedPlace.typical_duration_minutes != null && (
+                    <Text variant="bodySmall" style={styles.selectedPlaceMeta}>
+                      Typical visit: {Math.floor(selectedPlace.typical_duration_minutes / 60)}h {selectedPlace.typical_duration_minutes % 60}m
+                    </Text>
+                  )}
+
+                  {!!selectedPlace.google_maps_url && (
+                    <Button
+                      mode="text"
+                      icon="map-marker-outline"
+                      onPress={() => openGoogleMaps(selectedPlace.google_maps_url)}
+                      compact
+                      style={styles.inlineMapsButton}
+                    >
+                      Open in Google Maps
+                    </Button>
+                  )}
+                </View>
+              )}
+
               <Text variant="titleMedium" style={styles.timeSectionTitle}>
                 Set Activity Time
               </Text>
+
+              {mode === 'add' && (previousActivity || nextActivity) && (
+                <View style={styles.insertPreviewToggleWrap}>
+                  <Button
+                    mode="text"
+                    onPress={() => setShowInsertPreview((previous) => !previous)}
+                    icon={showInsertPreview ? 'chevron-up' : 'chevron-down'}
+                    compact
+                    style={styles.insertPreviewToggle}
+                  >
+                    Insert Preview
+                  </Button>
+
+                  {showInsertPreview && (
+                    <View style={styles.insertPreviewContainer}>
+                      {previousActivity && (
+                        <View style={styles.insertPreviewRow}>
+                          <Text variant="labelSmall" style={styles.insertPreviewTime}>
+                            {previousActivity.time_start} - {previousActivity.time_end}
+                          </Text>
+                          <Text variant="bodySmall" style={styles.insertPreviewText} numberOfLines={1}>
+                            {previousActivity.title}
+                          </Text>
+                        </View>
+                      )}
+
+                      <View style={[styles.insertPreviewRow, styles.insertPreviewCurrentRow]}>
+                        <Text variant="labelSmall" style={[styles.insertPreviewTime, styles.insertPreviewCurrentTime]}>
+                          {formatTo12Hour(timeStart.hours, timeStart.minutes)} - {formatTo12Hour(timeEnd.hours, timeEnd.minutes)}
+                        </Text>
+                        <Text variant="bodySmall" style={[styles.insertPreviewText, styles.insertPreviewCurrentText]} numberOfLines={1}>
+                          {selectedPlace.name}
+                        </Text>
+                      </View>
+
+                      {nextActivity && (
+                        <View style={styles.insertPreviewRow}>
+                          <Text variant="labelSmall" style={styles.insertPreviewTime}>
+                            {nextActivity.time_start} - {nextActivity.time_end}
+                          </Text>
+                          <Text variant="bodySmall" style={styles.insertPreviewText} numberOfLines={1}>
+                            {nextActivity.title}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
+              )}
 
               <View style={styles.timeInputs}>
                 <View style={styles.timeInputContainer}>
@@ -409,6 +823,16 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                   Duration: {duration} minutes ({Math.floor(duration / 60)}h {duration % 60}m)
                 </Text>
               </View>
+
+              {mode === 'add' && (
+                <Text variant="bodySmall" style={styles.timeHintText}>
+                  Suggested based on timeline slot
+                </Text>
+              )}
+
+              <Text variant="bodySmall" style={styles.adjustmentHintText}>
+                AI will intelligently adjust the whole day's itinerary based on this {mode === 'add' ? 'added' : 'replaced'} activity.
+              </Text>
             </ScrollView>
 
             <View
@@ -454,12 +878,11 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
         animationType="fade"
       />
 
-      {/* Place Detail Modal */}
-      <PlaceDetailModal
-        place={selectedPlace}
-        visible={placeDetailVisible}
-        onDismiss={() => setPlaceDetailVisible(false)}
-        provinceName={provinceName}
+      <PhotoViewerModal
+        visible={photoViewerVisible}
+        photos={selectedPlace?.photos || []}
+        initialIndex={selectedPhotoIndex}
+        onDismiss={() => setPhotoViewerVisible(false)}
       />
     </Portal>
   );
@@ -482,9 +905,56 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 8,
   },
+  headerTextContainer: {
+    flex: 1,
+    marginRight: 8,
+  },
   title: {
     fontWeight: 'bold',
-    flex: 1,
+  },
+  scopeText: {
+    opacity: 0.7,
+    marginTop: 2,
+  },
+  selectionSummaryCard: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    backgroundColor: '#FAFAFA',
+  },
+  selectionSummaryTitle: {
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  selectionSummaryLabel: {
+    opacity: 0.72,
+    marginTop: 2,
+  },
+  selectionFromLink: {
+    textDecorationLine: 'underline',
+    fontWeight: '600',
+  },
+  selectionFromText: {
+    fontWeight: '600',
+  },
+  selectionArrowRow: {
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  selectionToText: {
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  selectionSummaryAddress: {
+    opacity: 0.72,
+  },
+  moreDetailsToggle: {
+    alignSelf: 'flex-start',
+    marginTop: -2,
+    marginBottom: 6,
+    marginLeft: -8,
   },
   content: {
     paddingHorizontal: 16,
@@ -533,6 +1003,20 @@ const styles = StyleSheet.create({
   placeItem: {
     paddingVertical: 8,
   },
+  placeDescriptionContainer: {
+    marginTop: 2,
+  },
+  placeCategoryText: {
+    opacity: 0.9,
+  },
+  nearestBadgeText: {
+    color: '#00695C',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  placeAddressText: {
+    opacity: 0.7,
+  },
   placeIcon: {
     marginRight: 8,
     marginTop: 8,
@@ -568,17 +1052,67 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     flex: 1,
   },
-  infoButton: {
-    margin: 0,
-  },
   selectedPlaceCategory: {
     opacity: 0.7,
     marginTop: 4,
+  },
+  inlineDetailsSection: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 16,
+    backgroundColor: '#FAFAFA',
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  detailChip: {
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  selectedPlaceDescription: {
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  photosContainer: {
+    marginBottom: 10,
+  },
+  photosContent: {
+    gap: 8,
+    paddingBottom: 2,
+  },
+  photo: {
+    width: 86,
+    height: 86,
+    borderRadius: 8,
+  },
+  selectedPlaceAddress: {
+    opacity: 0.8,
+    marginBottom: 6,
+  },
+  selectedPlaceMeta: {
+    opacity: 0.85,
+    marginBottom: 4,
+  },
+  inlineMapsButton: {
+    alignSelf: 'flex-start',
+    marginLeft: -8,
   },
   timeSectionTitle: {
     fontWeight: 'bold',
     marginBottom: 16,
     marginTop: 8,
+  },
+  insertPreviewToggleWrap: {
+    marginBottom: 10,
+  },
+  insertPreviewToggle: {
+    alignSelf: 'flex-start',
+    marginLeft: -8,
+    marginBottom: 4,
   },
   timeInputs: {
     flexDirection: 'row',
@@ -603,6 +1137,54 @@ const styles = StyleSheet.create({
   durationText: {
     marginLeft: 8,
     fontWeight: '500',
+  },
+  timeHintText: {
+    opacity: 0.7,
+    marginBottom: 8,
+  },
+  proximityHintText: {
+    opacity: 0.72,
+    marginTop: 2,
+  },
+  adjustmentHintText: {
+    opacity: 0.75,
+    marginBottom: 12,
+  },
+  insertPreviewContainer: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 6,
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+  },
+  insertPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  insertPreviewCurrentRow: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+  },
+  insertPreviewTime: {
+    minWidth: 108,
+    opacity: 0.75,
+  },
+  insertPreviewCurrentTime: {
+    opacity: 1,
+    fontWeight: '600',
+  },
+  insertPreviewText: {
+    flex: 1,
+    opacity: 0.85,
+  },
+  insertPreviewCurrentText: {
+    fontWeight: '600',
+    opacity: 1,
   },
   actions: {
     flexDirection: 'row',

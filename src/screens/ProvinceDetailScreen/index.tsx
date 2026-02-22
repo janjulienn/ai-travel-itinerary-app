@@ -56,15 +56,6 @@ export default function ProvinceDetailScreen() {
     });
   };
 
-  // Group places by category
-  const placesByCategory = (province.top_places || []).reduce((acc, place) => {
-    if (!acc[place.category]) {
-      acc[place.category] = [];
-    }
-    acc[place.category].push(place);
-    return acc;
-  }, {} as Record<string, typeof province.top_places>);
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
     <ScrollView style={styles.container}>
@@ -106,21 +97,21 @@ export default function ProvinceDetailScreen() {
       </Card>
 
       {/* Top Places Section */}
-      {province.top_places.length > 0 && (
+      {(province.top_places_by_category || []).length > 0 && (
         <View style={styles.placesSection}>
           <Text variant="titleLarge" style={styles.sectionTitle}>
             Top Places to Visit
           </Text>
 
-          {Object.entries(placesByCategory).map(([category, places]) => (
-            <View key={category} style={styles.categorySection}>
+          {(province.top_places_by_category || []).map((group) => (
+            <View key={group.category} style={styles.categorySection}>
               <Text variant="titleMedium" style={styles.categoryTitle}>
-                {places[0].category_display}
+                {group.category_display}
               </Text>
 
-              {places.map((place) => (
+              {group.places.map((place) => (
                 <List.Item
-                  key={place.id}
+                  key={place.google_place_id}
                   title={place.name}
                   description={
                     place.description

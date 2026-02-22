@@ -10,8 +10,8 @@ import {
   NativeScrollEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, Button, ActivityIndicator, useTheme } from 'react-native-paper';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { Text, Button, ActivityIndicator, Snackbar, useTheme } from 'react-native-paper';
+import { useNavigation, useFocusEffect, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AxiosError } from 'axios';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -26,9 +26,11 @@ import type { IItineraryList } from '../../types/dtos/itinerary';
 import { TripsStackParamList } from '../../types/navigation';
 
 type NavigationProp = NativeStackNavigationProp<TripsStackParamList>;
+type TripsRouteProp = RouteProp<TripsStackParamList, 'Trips'>;
 
 export default function TripsScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<TripsRouteProp>();
   const theme = useTheme();
   const { state } = useApp();
   const { itineraries, loading, error, refresh } = useItineraries();
@@ -38,6 +40,17 @@ export default function TripsScreen() {
   const [itineraryToDelete, setItineraryToDelete] = React.useState<IItineraryList | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
+  const [toastMessage, setToastMessage] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const message = route.params?.toastMessage;
+    if (!message) {
+      return;
+    }
+
+    setToastMessage(message);
+    navigation.setParams({ toastMessage: undefined });
+  }, [navigation, route.params?.toastMessage]);
 
   // Refetch itineraries when screen comes into focus
   useFocusEffect(
@@ -45,6 +58,22 @@ export default function TripsScreen() {
       refresh();
     }, [refresh])
   );
+
+  React.useEffect(() => {
+    const hasInFlight = itineraries.some(
+      (item) => item.status === 'generating' || item.status === 'updating'
+    );
+
+    if (!hasInFlight) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      refresh();
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [itineraries, refresh]);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetY = event.nativeEvent.contentOffset.y;
@@ -235,6 +264,9 @@ export default function TripsScreen() {
         loading={isDeleting}
         errorMessage={deleteError}
       />
+      <Snackbar visible={Boolean(toastMessage)} onDismiss={() => setToastMessage(null)} duration={3500}>
+        {toastMessage}
+      </Snackbar>
     </View>
   );
 }

@@ -1,10 +1,10 @@
 // Itinerary detail screen - full day-by-day itinerary
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Card, Chip, Button, ActivityIndicator, useTheme, Portal, Modal, IconButton } from 'react-native-paper';
-import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
+import { useRoute, RouteProp, useNavigation, useIsFocused } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ErrorCard } from '../../components/common/ErrorCard';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
@@ -15,23 +15,32 @@ import { itinerariesApi } from '../../services/api/itineraries';
 import { addPendingItinerary } from '../../services/pendingItineraries';
 import { STATUS_CONFIG } from '../../constants';
 import type { TripsStackParamList } from '../../types/navigation';
-import type { IActivityAddRequest, IActivityReplaceRequest, IActivityDeleteRequest, IItineraryDay } from '../../types/dtos/itinerary';
+import type {
+  IActivityAddRequest,
+  IActivityReplaceRequest,
+  IActivityDeleteRequest,
+  IItineraryAdjustmentHistoryItem,
+  IItineraryDay,
+} from '../../types/dtos/itinerary';
 
 type RouteProps = RouteProp<TripsStackParamList, 'ItineraryDetail'>;
 const STICKY_SHOW_OFFSET = 8;
 const ACCORDION_HEADER_TO_CONTENT_OFFSET = 78;
+const STICKY_ROW_MIN_HEIGHT = 72;
+const STICKY_ROW_MAX_HEIGHT = 96;
 
 export default function ItineraryDetailScreen() {
   const route = useRoute<RouteProps>();
   const navigation = useNavigation();
+  const isFocused = useIsFocused();
   const theme = useTheme();
+  const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { itinerary, loading, error, refresh } = useItineraryDetail(route.params.id);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [adjustmentSummaryVisible, setAdjustmentSummaryVisible] = useState(false);
   const [adjustmentSummary, setAdjustmentSummary] = useState<string>('');
-  const [queuedModalVisible, setQueuedModalVisible] = useState(false);
   const [expandedDayNumber, setExpandedDayNumber] = useState<number | null>(1);
   const [dayHeaderLayouts, setDayHeaderLayouts] = useState<Record<number, { y: number; height: number }>>({});
   const [timelineTopY, setTimelineTopY] = useState(0);
@@ -40,7 +49,21 @@ export default function ItineraryDetailScreen() {
   const [pendingAutoScrollDay, setPendingAutoScrollDay] = useState<number | null>(null);
   const [editingDayNumber, setEditingDayNumber] = useState<number | null>(null);
   const [editToggleSignal, setEditToggleSignal] = useState(0);
+  const [historyVisible, setHistoryVisible] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyItems, setHistoryItems] = useState<IItineraryAdjustmentHistoryItem[]>([]);
   const itineraryScrollRef = useRef<ScrollView>(null);
+  const seenMarkedRef = useRef(false);
+
+  const historyModalMaxHeight = width >= 768 ? '97%' : '92%';
+
+  useEffect(() => {
+    if (isFocused) {
+      return;
+    }
+
+    setAdjustmentSummaryVisible(false);
+  }, [isFocused]);
 
   const expandedDay = useMemo<IItineraryDay | null>(() => {
     if (!expandedDayNumber) {
@@ -71,7 +94,10 @@ export default function ItineraryDetailScreen() {
       .filter((height) => height > 0);
 
     if (measuredHeights.length > 0) {
-      return Math.min(...measuredHeights);
+      return Math.min(
+        STICKY_ROW_MAX_HEIGHT,
+        Math.max(STICKY_ROW_MIN_HEIGHT, Math.min(...measuredHeights))
+      );
     }
 
     const fallbackHeights = Object.values(dayHeaderLayouts)
@@ -79,7 +105,10 @@ export default function ItineraryDetailScreen() {
       .filter((height) => height > 0);
 
     if (fallbackHeights.length > 0) {
-      return Math.min(...fallbackHeights);
+      return Math.min(
+        STICKY_ROW_MAX_HEIGHT,
+        Math.max(STICKY_ROW_MIN_HEIGHT, Math.min(...fallbackHeights))
+      );
     }
 
     return 82;
@@ -107,18 +136,45 @@ export default function ItineraryDetailScreen() {
     });
   }, [dayHeaderLayouts, pendingAutoScrollDay, timelineTopY]);
 
+  useEffect(() => {
+    if (!isFocused || !itinerary?.has_unseen_update || seenMarkedRef.current) {
+      return;
+    }
+
+    seenMarkedRef.current = true;
+
+    if (itinerary.latest_adjustment_summary) {
+      setAdjustmentSummary(itinerary.latest_adjustment_summary);
+      setAdjustmentSummaryVisible(true);
+    }
+
+    itinerariesApi.markAdjustmentsSeen(itinerary.id).catch((err) => {
+      console.error('Error marking adjustments as seen:', err);
+      seenMarkedRef.current = false;
+    });
+  }, [isFocused, itinerary?.has_unseen_update, itinerary?.id, itinerary?.latest_adjustment_summary]);
+
+  useEffect(() => {
+    if (!isFocused || (itinerary?.status !== 'generating' && itinerary?.status !== 'updating')) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      refresh();
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [isFocused, itinerary?.status, refresh]);
+
   const handleActivityAdded = async (dayId: number, data: Omit<IActivityAddRequest, 'day_id'>) => {
     try {
       setEditLoading(true);
       setEditError(null);
-      const response = await itinerariesApi.addActivity(route.params.id, { ...data, day_id: dayId });
-      await refresh(); // Refresh to get updated itinerary
-      
-      // Show adjustment summary if available
-      if (response.adjustment_summary) {
-        setAdjustmentSummary(response.adjustment_summary);
-        setAdjustmentSummaryVisible(true);
-      }
+      await itinerariesApi.addActivity(route.params.id, { ...data, day_id: dayId });
+      (navigation as any).navigate('TripsTab', {
+        screen: 'Trips',
+        params: { toastMessage: 'Itinerary update is ongoing. You can check back shortly.' },
+      });
     } catch (err: any) {
       console.error('Error adding activity:', err);
       setEditError(err.message || 'Failed to add activity');
@@ -131,14 +187,11 @@ export default function ItineraryDetailScreen() {
     try {
       setEditLoading(true);
       setEditError(null);
-      const response = await itinerariesApi.replaceActivity(route.params.id, { ...data, activity_id: activityId });
-      await refresh(); // Refresh to get updated itinerary
-      
-      // Show adjustment summary if available
-      if (response.adjustment_summary) {
-        setAdjustmentSummary(response.adjustment_summary);
-        setAdjustmentSummaryVisible(true);
-      }
+      await itinerariesApi.replaceActivity(route.params.id, { ...data, activity_id: activityId });
+      (navigation as any).navigate('TripsTab', {
+        screen: 'Trips',
+        params: { toastMessage: 'Itinerary update is ongoing. You can check back shortly.' },
+      });
     } catch (err: any) {
       console.error('Error replacing activity:', err);
       setEditError(err.message || 'Failed to replace activity');
@@ -151,14 +204,8 @@ export default function ItineraryDetailScreen() {
     try {
       setEditLoading(true);
       setEditError(null);
-      const response = await itinerariesApi.deleteActivity(route.params.id, { activity_id: activityId });
-      await refresh(); // Refresh to get updated itinerary
-      
-      // Show adjustment summary if available
-      if (response.adjustment_summary) {
-        setAdjustmentSummary(response.adjustment_summary);
-        setAdjustmentSummaryVisible(true);
-      }
+      await itinerariesApi.deleteActivity(route.params.id, { activity_id: activityId });
+      await refresh();
     } catch (err: any) {
       console.error('Error deleting activity:', err);
       setEditError(err.message || 'Failed to delete activity');
@@ -173,8 +220,10 @@ export default function ItineraryDetailScreen() {
       setEditError(null);
       const response = await itinerariesApi.regenerateItinerary(route.params.id);
       await addPendingItinerary(response.id);
-      setQueuedModalVisible(true);
       await refresh();
+      (navigation as any).navigate('Trips', {
+        toastMessage: 'Itinerary update is ongoing. You can check back shortly.',
+      });
     } catch (err: any) {
       console.error('Error regenerating itinerary:', err);
       setEditError(err.message || 'Failed to regenerate itinerary');
@@ -183,9 +232,29 @@ export default function ItineraryDetailScreen() {
     }
   };
 
-  const handleQueuedModalOk = () => {
-    setQueuedModalVisible(false);
-    (navigation as any).navigate('Trips');
+  const handleOpenHistory = async () => {
+    try {
+      setHistoryLoading(true);
+      const items = await itinerariesApi.listAdjustments(route.params.id);
+      setHistoryItems(items);
+      setHistoryVisible(true);
+    } catch (err: any) {
+      setEditError(err.message || 'Failed to load adjustment history');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const getSummaryBullets = (summary?: string): string[] => {
+    if (!summary) {
+      return [];
+    }
+
+    return summary
+      .split(/\.\s+/)
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
+      .map((item) => (item.endsWith('.') ? item : `${item}.`));
   };
 
   const handleStickyHeaderPress = () => {
@@ -331,6 +400,18 @@ export default function ItineraryDetailScreen() {
             </Text>
           )}
 
+          <View style={styles.headerActions}>
+            <Button
+              mode="outlined"
+              icon="history"
+              onPress={handleOpenHistory}
+              loading={historyLoading}
+              disabled={historyLoading}
+            >
+              View Update History
+            </Button>
+          </View>
+
           {/* Trip Stats */}
           <View style={styles.stats}>
             {itinerary.preferences.budget_range && (
@@ -371,11 +452,19 @@ export default function ItineraryDetailScreen() {
       </Card>
 
       {/* Timeline */}
-      {itinerary.status === 'ready' && itinerary.days.length > 0 && (
+      {(itinerary.status === 'ready' || itinerary.status === 'updating') && itinerary.days.length > 0 && (
         <View
           style={styles.timelineContainer}
           onLayout={(event) => setTimelineTopY(event.nativeEvent.layout.y)}
         >
+          {itinerary.status === 'updating' && (
+            <View style={[styles.updatingBanner, { backgroundColor: theme.colors.secondaryContainer }]}> 
+              <MaterialCommunityIcons name="progress-clock" size={18} color={theme.colors.onSecondaryContainer} />
+              <Text variant="bodyMedium" style={[styles.updatingBannerText, { color: theme.colors.onSecondaryContainer }]}>
+                Updating itinerary… changes are processing in the background.
+              </Text>
+            </View>
+          )}
           <Text variant="titleLarge" style={styles.timelineTitle}>
             Your Itinerary
           </Text>
@@ -387,7 +476,7 @@ export default function ItineraryDetailScreen() {
             onActivityAdded={handleActivityAdded}
             onActivityReplaced={handleActivityReplaced}
             onActivityDeleted={handleActivityDeleted}
-            isLoading={editLoading}
+            isLoading={editLoading || itinerary.status === 'updating'}
             onExpandedDayChange={handleExpandedDayChange}
             onDayHeaderLayout={(dayNumber, layout) => {
               setDayHeaderLayouts((current) => ({ ...current, [dayNumber]: layout }));
@@ -449,22 +538,50 @@ export default function ItineraryDetailScreen() {
 
       <Portal>
         <Modal
-          visible={queuedModalVisible}
-          onDismiss={handleQueuedModalOk}
+          visible={historyVisible}
+          onDismiss={() => setHistoryVisible(false)}
           contentContainerStyle={styles.modalContainer}
         >
-          <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.surface, maxHeight: historyModalMaxHeight }]}>
             <Text variant="titleLarge" style={styles.modalTitle}>
-              Regeneration started
+              Adjustment History
             </Text>
-            <Text variant="bodyMedium" style={styles.modalMessage}>
-              Your itinerary is being regenerated in the background. This can take around 90 seconds or longer depending on the number of days.
-            </Text>
-            <Text variant="bodyMedium" style={styles.modalMessage}>
-              You can track it in My Trips with status: generating.
-            </Text>
-            <Button mode="contained" onPress={handleQueuedModalOk}>
-              OK
+            <ScrollView>
+              {historyItems.length === 0 ? (
+                <Text variant="bodyMedium" style={styles.modalMessage}>
+                  No updates yet.
+                </Text>
+              ) : (
+                historyItems.map((item) => (
+                  <View key={item.id} style={[styles.historyItem, { borderBottomColor: theme.colors.outlineVariant }]}> 
+                    <Text variant="labelLarge">
+                      {item.operation_display} • {item.status_display}
+                    </Text>
+                    {!!item.summary && (
+                      <View style={styles.historySummaryContainer}>
+                        {getSummaryBullets(item.summary).map((bullet, index) => (
+                          <Text key={`${item.id}-bullet-${index}`} variant="bodyMedium" style={styles.historySummaryBullet}>
+                            • {bullet}
+                          </Text>
+                        ))}
+                      </View>
+                    )}
+                    {!!item.error_message && (
+                      <Text variant="bodySmall" style={{ color: theme.colors.error }}>
+                        {item.error_message}
+                      </Text>
+                    )}
+                    {item.completed_at && (
+                      <Text variant="bodySmall" style={styles.historyMeta}>
+                        Completed: {new Date(item.completed_at).toLocaleString()}
+                      </Text>
+                    )}
+                  </View>
+                ))
+              )}
+            </ScrollView>
+            <Button mode="contained" onPress={() => setHistoryVisible(false)}>
+              Close
             </Button>
           </View>
         </Modal>
@@ -518,6 +635,9 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     opacity: 0.8,
   },
+  headerActions: {
+    marginTop: 12,
+  },
   stats: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -546,6 +666,18 @@ const styles = StyleSheet.create({
   timelineContainer: {
     margin: 16,
     marginTop: 0,
+  },
+  updatingBanner: {
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  updatingBannerText: {
+    marginLeft: 8,
+    flex: 1,
   },
   timelineTitle: {
     fontWeight: 'bold',
@@ -628,5 +760,20 @@ const styles = StyleSheet.create({
   },
   modalMessage: {
     lineHeight: 22,
+  },
+  historyItem: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  historySummaryContainer: {
+    marginTop: 4,
+    gap: 4,
+  },
+  historySummaryBullet: {
+    lineHeight: 20,
+  },
+  historyMeta: {
+    marginTop: 6,
+    opacity: 0.7,
   },
 });

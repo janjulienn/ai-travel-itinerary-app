@@ -13,6 +13,47 @@ import { PlaceSearchBottomSheet } from '../PlaceSearchBottomSheet';
 import { DeleteActivityModal } from '../DeleteActivityModal';
 import { ACTIVITY_CATEGORIES } from '../../constants';
 
+const MINUTES_PER_DAY = 24 * 60;
+
+const parse12HourTimeToMinutes = (timeStr: string): number => {
+  const [timePart, period] = timeStr.split(' ');
+  let [hours, minutes] = timePart.split(':').map(Number);
+
+  if (period === 'PM' && hours !== 12) {
+    hours += 12;
+  } else if (period === 'AM' && hours === 12) {
+    hours = 0;
+  }
+
+  return hours * 60 + minutes;
+};
+
+const formatMinutesTo24HourTime = (totalMinutes: number): string => {
+  const normalizedMinutes = Math.max(0, Math.min(totalMinutes, MINUTES_PER_DAY - 1));
+  const hours = Math.floor(normalizedMinutes / 60);
+  const minutes = normalizedMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
+const clampOneHourRange = (startMinutes: number): { start: number; end: number } => {
+  const clampedStart = Math.max(0, Math.min(startMinutes, MINUTES_PER_DAY - 60));
+  return { start: clampedStart, end: clampedStart + 60 };
+};
+
+const isTransitActivity = (activity: IItineraryActivity): boolean => {
+  const categoryValue = (activity.category || '').toLowerCase();
+  const categoryDisplay = (activity.category_display || '').toLowerCase();
+  const titleValue = (activity.title || '').toLowerCase();
+
+  return (
+    categoryValue === 'travel' ||
+    categoryDisplay.includes('travel') ||
+    categoryDisplay.includes('transit') ||
+    titleValue.includes('travel') ||
+    titleValue.includes('transit')
+  );
+};
+
 interface ItineraryTimelineProps {
   days: IItineraryDay[];
   itineraryId: string;
@@ -28,6 +69,15 @@ interface ItineraryTimelineProps {
   onEditingDayChange?: (dayNumber: number | null) => void;
   editToggleSignal?: number;
   editToggleDayNumber?: number | null;
+}
+
+interface IAdjacentActivitySummary {
+  id: number;
+  title: string;
+  time_start: string;
+  time_end: string;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
@@ -58,6 +108,10 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
     dayId?: number;
     activityId?: number;
     insertAfterOrder?: number;
+    suggestedTimeStart?: string;
+    suggestedTimeEnd?: string;
+    previousActivity?: IAdjacentActivitySummary;
+    nextActivity?: IAdjacentActivitySummary;
   }>({});
   const [activityBeingReplaced, setActivityBeingReplaced] = useState<IItineraryActivity | null>(null);
   
@@ -109,8 +163,119 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
   }, [collapseSignal, editingDayId]);
 
   const handleAddActivity = (dayId: number, insertAfterOrder?: number) => {
+    const targetDay = days.find((day) => day.id === dayId);
+
+    let suggestedTimeStart: string | undefined;
+    let suggestedTimeEnd: string | undefined;
+    let previousActivitySummary: IAdjacentActivitySummary | undefined;
+    let nextActivitySummary: IAdjacentActivitySummary | undefined;
+
+    if (targetDay) {
+      const sortedActivities = [...(targetDay.activities || [])].sort((a, b) => a.order - b.order);
+      const nonTransitActivities = sortedActivities.filter((activity) => !isTransitActivity(activity));
+
+      if (nonTransitActivities.length > 0) {
+        const firstActivity = nonTransitActivities[0];
+        const lastActivity = nonTransitActivities[nonTransitActivities.length - 1];
+
+        let startMinutes: number;
+        let endMinutes: number;
+
+        if (insertAfterOrder === undefined) {
+          const firstStart = parse12HourTimeToMinutes(firstActivity.time_start);
+          const oneHourBeforeFirst = clampOneHourRange(firstStart - 60);
+          startMinutes = oneHourBeforeFirst.start;
+          endMinutes = oneHourBeforeFirst.end;
+          nextActivitySummary = {
+            id: firstActivity.id,
+            title: firstActivity.title,
+            time_start: firstActivity.time_start,
+            time_end: firstActivity.time_end,
+            latitude: firstActivity.place_detail?.latitude ?? null,
+            longitude: firstActivity.place_detail?.longitude ?? null,
+          };
+        } else {
+          const previousActivity =
+            nonTransitActivities.find((activity) => activity.order === insertAfterOrder) ||
+            [...nonTransitActivities]
+              .reverse()
+              .find((activity) => activity.order < insertAfterOrder);
+
+          const nextActivity = nonTransitActivities.find((activity) => activity.order > insertAfterOrder);
+
+          if (previousActivity) {
+            previousActivitySummary = {
+              id: previousActivity.id,
+              title: previousActivity.title,
+              time_start: previousActivity.time_start,
+              time_end: previousActivity.time_end,
+              latitude: previousActivity.place_detail?.latitude ?? null,
+              longitude: previousActivity.place_detail?.longitude ?? null,
+            };
+          }
+
+          if (nextActivity) {
+            nextActivitySummary = {
+              id: nextActivity.id,
+              title: nextActivity.title,
+              time_start: nextActivity.time_start,
+              time_end: nextActivity.time_end,
+              latitude: nextActivity.place_detail?.latitude ?? null,
+              longitude: nextActivity.place_detail?.longitude ?? null,
+            };
+          }
+
+          if (previousActivity && nextActivity) {
+            const previousEnd = parse12HourTimeToMinutes(previousActivity.time_end);
+            const nextStart = parse12HourTimeToMinutes(nextActivity.time_start);
+
+            const median = Math.floor((previousEnd + nextStart) / 2);
+            const centeredStart = median - 30;
+            const centeredEnd = centeredStart + 60;
+
+            if (centeredStart < previousEnd || centeredEnd > nextStart) {
+              const fallbackAfterPrevious = clampOneHourRange(previousEnd);
+              startMinutes = fallbackAfterPrevious.start;
+              endMinutes = fallbackAfterPrevious.end;
+            } else {
+              const centeredRange = clampOneHourRange(centeredStart);
+              startMinutes = centeredRange.start;
+              endMinutes = centeredRange.end;
+            }
+          } else if (previousActivity) {
+            const previousEnd = parse12HourTimeToMinutes(previousActivity.time_end);
+            const rangeAfterPrevious = clampOneHourRange(previousEnd);
+            startMinutes = rangeAfterPrevious.start;
+            endMinutes = rangeAfterPrevious.end;
+          } else {
+            const firstStart = parse12HourTimeToMinutes(firstActivity.time_start);
+            const oneHourBeforeFirst = clampOneHourRange(firstStart - 60);
+            startMinutes = oneHourBeforeFirst.start;
+            endMinutes = oneHourBeforeFirst.end;
+          }
+
+          if (!nextActivity && previousActivity?.id === lastActivity.id) {
+            const previousEnd = parse12HourTimeToMinutes(previousActivity.time_end);
+            const afterLast = clampOneHourRange(previousEnd);
+            startMinutes = afterLast.start;
+            endMinutes = afterLast.end;
+          }
+        }
+
+        suggestedTimeStart = formatMinutesTo24HourTime(startMinutes);
+        suggestedTimeEnd = formatMinutesTo24HourTime(endMinutes);
+      }
+    }
+
     setSearchMode('add');
-    setSearchContext({ dayId, insertAfterOrder });
+    setSearchContext({
+      dayId,
+      insertAfterOrder,
+      suggestedTimeStart,
+      suggestedTimeEnd,
+      previousActivity: previousActivitySummary,
+      nextActivity: nextActivitySummary,
+    });
     setPlaceSearchVisible(true);
   };
 
@@ -134,7 +299,7 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
   }) => {
     if (searchMode === 'add' && searchContext.dayId && onActivityAdded) {
       await onActivityAdded(searchContext.dayId, {
-        place_id: data.place.id,
+        google_place_id: data.place.google_place_id,
         time_start: data.time_start,
         time_end: data.time_end,
         duration_minutes: data.duration_minutes,
@@ -142,7 +307,7 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
       });
     } else if (searchMode === 'replace' && searchContext.activityId && onActivityReplaced) {
       await onActivityReplaced(searchContext.activityId, {
-        new_place_id: data.place.id,
+        new_google_place_id: data.place.google_place_id,
         time_start: data.time_start,
         time_end: data.time_end,
         duration_minutes: data.duration_minutes,
@@ -202,6 +367,10 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
         {(days || []).map((day, index) => {
           const isExpanded = expandedDay === day.day_number;
           const isEditingThisDay = editingDayId === day.id;
+          const nonTransitActivities = (day.activities || []).filter((activity) => !isTransitActivity(activity));
+          const displayedActivities = isEditingThisDay
+            ? nonTransitActivities
+            : (day.activities || []);
 
           return (
             <View key={day.id} onLayout={handleDayHeaderLayout(day.day_number)}>
@@ -247,7 +416,7 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
                       </Button>
                     )}
 
-                    {(day.activities || []).map((activity, activityIndex) => (
+                    {displayedActivities.map((activity, activityIndex) => (
                       <View key={activity.id}>
                         <VerticalTimelineItem
                           startTime={activity.time_start}
@@ -257,20 +426,36 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
                             ACTIVITY_CATEGORIES[activity.category]?.color || theme.colors.primary
                           }
                           isFirst={activityIndex === 0}
-                          isLast={activityIndex === day.activities.length - 1}
+                          isLast={activityIndex === displayedActivities.length - 1}
                         >
-                          <ActivityCard
-                            activity={activity}
-                            showTime={false}
-                            onViewPlace={
-                              activity.place_detail
-                                ? () => setSelectedPlace(activity.place_detail)
-                                : undefined
-                            }
-                            isEditing={isEditingThisDay}
-                            onReplace={() => handleReplaceActivity(activity)}
-                            onDelete={() => handleDeleteActivity(activity)}
-                          />
+                          {isTransitActivity(activity) ? (
+                            <View style={[styles.transitRow, { borderColor: theme.colors.outlineVariant }]}> 
+                              <View style={styles.transitContentRow}>
+                                <MaterialCommunityIcons
+                                  name="car"
+                                  size={18}
+                                  color={theme.colors.primary}
+                                  style={styles.transitIcon}
+                                />
+                                <Text variant="labelMedium" style={[styles.transitLabel, { color: theme.colors.primary }]}> 
+                                  Travel / Transit
+                                </Text>
+                              </View>
+                            </View>
+                          ) : (
+                            <ActivityCard
+                              activity={activity}
+                              showTime={false}
+                              onViewPlace={
+                                activity.place_detail
+                                  ? () => setSelectedPlace(activity.place_detail)
+                                  : undefined
+                              }
+                              isEditing={isEditingThisDay}
+                              onReplace={() => handleReplaceActivity(activity)}
+                              onDelete={() => handleDeleteActivity(activity)}
+                            />
+                          )}
                         </VerticalTimelineItem>
                         
                         {/* Insert button after each activity */}
@@ -316,6 +501,10 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
         provinceName={provinceName}
         mode={searchMode}
         activityToReplace={activityBeingReplaced}
+        initialAddTimeStart={searchContext.suggestedTimeStart}
+        initialAddTimeEnd={searchContext.suggestedTimeEnd}
+        previousActivity={searchContext.previousActivity}
+        nextActivity={searchContext.nextActivity}
       />
 
       <DeleteActivityModal
@@ -373,5 +562,28 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     width: '100%',
     alignSelf: 'stretch',
+  },
+  transitRow: {
+    borderWidth: 1,
+    borderRadius: 10,
+    borderStyle: 'dashed',
+    marginVertical: 6,
+    minHeight: 64,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  transitLabel: {
+    fontWeight: '700',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  transitContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  transitIcon: {
+    marginRight: 8,
   },
 });

@@ -35,4 +35,18 @@ export const provincesApi = {
     const response = await apiClient.get<{ results: IPlace[] }>(`/provinces/${slug}/places/`, { params });
     return response.results || [];
   },
+
+  /**
+   * Autocomplete places in a province
+   * GET /provinces/{slug}/places-autocomplete/
+   */
+  autocompleteProvincePlaces: async (
+    slug: string,
+    params: {
+      q: string;
+      category?: string;
+    }
+  ): Promise<IPlace[]> => {
+    return apiClient.get<IPlace[]>(`/provinces/${slug}/places-autocomplete/`, { params });
+  },
 };

@@ -20,6 +20,9 @@ const mapDetailToList = (item: IItineraryDetail): IItineraryList => ({
   summary: item.summary,
   status: item.status,
   status_display: item.status_display,
+  has_unseen_update: item.has_unseen_update,
+  latest_adjustment_summary: item.latest_adjustment_summary,
+  latest_adjustment_completed_at: item.latest_adjustment_completed_at,
   created_at: item.created_at,
 });
 

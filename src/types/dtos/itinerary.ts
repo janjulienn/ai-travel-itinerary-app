@@ -17,7 +17,7 @@ export type ActivityCategory =
   | 'check_in' 
   | 'free_time';
 
-export type ItineraryStatus = 'generating' | 'ready' | 'failed';
+export type ItineraryStatus = 'generating' | 'updating' | 'ready' | 'failed';
 
 export type BudgetRange = 'budget' | 'moderate' | 'comfortable' | 'luxury';
 
@@ -71,6 +71,9 @@ export interface IItineraryList {
   summary: string;
   status: ItineraryStatus;
   status_display: string;
+  has_unseen_update: boolean;
+  latest_adjustment_summary: string | null;
+  latest_adjustment_completed_at: string | null;
   created_at: string; // ISO datetime
 }
 
@@ -98,6 +101,12 @@ export interface IItineraryAsyncAccepted {
   status: 'generating';
 }
 
+export interface IItineraryAdjustmentAsyncAccepted {
+  id: string;
+  adjustment_id: number;
+  status: 'updating';
+}
+
 export interface IGuestPendingItinerary {
   id: string;
   created_at: string;
@@ -105,7 +114,7 @@ export interface IGuestPendingItinerary {
 
 export interface IActivityAddRequest {
   day_id: number;
-  place_id: number;
+  google_place_id: string;
   time_start: string; // HH:MM format
   time_end: string; // HH:MM format
   duration_minutes: number;
@@ -114,7 +123,7 @@ export interface IActivityAddRequest {
 
 export interface IActivityReplaceRequest {
   activity_id: number;
-  new_place_id: number;
+  new_google_place_id: string;
   time_start: string; // HH:MM format
   time_end: string; // HH:MM format
   duration_minutes: number;
@@ -126,4 +135,21 @@ export interface IActivityDeleteRequest {
 
 export interface IItineraryAdjustmentResponse extends IItineraryDetail {
   adjustment_summary?: string;
+}
+
+export type ItineraryAdjustmentOperation = 'add' | 'replace' | 'delete';
+export type ItineraryAdjustmentStatus = 'queued' | 'processing' | 'completed' | 'failed';
+
+export interface IItineraryAdjustmentHistoryItem {
+  id: number;
+  operation: ItineraryAdjustmentOperation;
+  operation_display: string;
+  status: ItineraryAdjustmentStatus;
+  status_display: string;
+  summary: string;
+  error_message: string;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  seen_at: string | null;
 }

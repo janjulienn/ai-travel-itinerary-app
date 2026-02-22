@@ -5,13 +5,13 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Portal, Modal, Text, Button, useTheme } from 'react-native-paper';
+import { useTheme } from 'react-native-paper';
 import { GenerateWizard } from '../../components/GenerateWizard';
 import { ErrorCard } from '../../components/common/ErrorCard';
 import { useProvinces } from '../../hooks/useProvinces';
 import { itinerariesApi } from '../../services/api/itineraries';
 import { addPendingItinerary } from '../../services/pendingItineraries';
-import type { GenerateStackParamList, TripsStackParamList } from '../../types/navigation';
+import type { GenerateStackParamList } from '../../types/navigation';
 import type { IItineraryCreateRequest } from '../../types/dtos/itinerary';
 
 type NavigationProp = NativeStackNavigationProp<any>;
@@ -26,7 +26,6 @@ export default function GenerateScreen() {
   const [error, setError] = useState('');
   const [lastRequestData, setLastRequestData] = useState<IItineraryCreateRequest | null>(null);
   const [wizardResetKey, setWizardResetKey] = useState(0);
-  const [queuedModalVisible, setQueuedModalVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -45,7 +44,13 @@ export default function GenerateScreen() {
       await addPendingItinerary(itinerary.id);
 
       setWizardResetKey((prev) => prev + 1);
-      setQueuedModalVisible(true);
+      navigation.navigate(
+        'TripsTab',
+        {
+          screen: 'Trips',
+          params: { toastMessage: 'Itinerary generation is ongoing. You can check back shortly.' },
+        } as any
+      );
     } catch (err: any) {
       console.error('Error generating itinerary:', err);
       
@@ -68,11 +73,6 @@ export default function GenerateScreen() {
     }
   };
 
-  const handleQueuedModalOk = () => {
-    setQueuedModalVisible(false);
-    navigation.navigate('TripsTab', { screen: 'Trips' } as any);
-  };
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -92,29 +92,6 @@ export default function GenerateScreen() {
           />
         )}
       </ScrollView>
-
-      <Portal>
-        <Modal
-          visible={queuedModalVisible}
-          onDismiss={handleQueuedModalOk}
-          contentContainerStyle={styles.modalContainer}
-        >
-          <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
-            <Text variant="titleLarge" style={styles.modalTitle}>
-              Itinerary generation started
-            </Text>
-            <Text variant="bodyMedium" style={styles.modalMessage}>
-              Your itinerary is being generated in the background. This can take around 90 seconds or longer depending on the number of days in your request.
-            </Text>
-            <Text variant="bodyMedium" style={styles.modalMessage}>
-              You can track it in My Trips with status: generating.
-            </Text>
-            <Button mode="contained" onPress={handleQueuedModalOk}>
-              OK
-            </Button>
-          </View>
-        </Modal>
-      </Portal>
     </SafeAreaView>
   );
 }
@@ -126,19 +103,5 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-  },
-  modalContainer: {
-    margin: 20,
-  },
-  modalContent: {
-    borderRadius: 12,
-    padding: 20,
-    gap: 12,
-  },
-  modalTitle: {
-    fontWeight: '700',
-  },
-  modalMessage: {
-    lineHeight: 22,
   },
 });

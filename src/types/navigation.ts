@@ -19,7 +19,11 @@ export type GenerateStackParamList = {
 };
 
 export type TripsStackParamList = {
-  Trips: undefined;
+  Trips:
+    | {
+        toastMessage?: string;
+      }
+    | undefined;
   ItineraryDetail: { id: string };
 };
 

@@ -77,15 +77,6 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
               </Chip>
 
               <View style={styles.headerActions}>
-                {googleMapsUrl && (
-                  <IconButton
-                    icon="map"
-                    size={24}
-                    onPress={openGoogleMaps}
-                    iconColor={theme.colors.primary}
-                    style={{ margin: 0 }}
-                  />
-                )}
                 {isEditing && onReplace && (
                   <IconButton
                     icon="swap-horizontal"
@@ -134,9 +125,17 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
               color={theme.colors.primary}
             />
             <View style={styles.locationText}>
-              <Text variant="bodyMedium" style={styles.locationName}>
-                {activity.location_name}
-              </Text>
+              {googleMapsUrl ? (
+                <Pressable onPress={openGoogleMaps}>
+                  <Text variant="bodyMedium" style={[styles.locationName, styles.locationLink]}>
+                    {activity.location_name}
+                  </Text>
+                </Pressable>
+              ) : (
+                <Text variant="bodyMedium" style={styles.locationName}>
+                  {activity.location_name}
+                </Text>
+              )}
               {activity.location_address && (
                 <Text variant="bodySmall" style={styles.locationAddress}>
                   {activity.location_address}
@@ -244,16 +243,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
     marginBottom: 6,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginLeft: 'auto',
     marginRight: -4,
   },
   categoryChip: {
     alignSelf: 'flex-start',
+    flexShrink: 1,
     height: 28,
+    marginRight: 8,
+    marginBottom: 4,
   },
   title: {
     fontWeight: 'bold',
@@ -285,6 +289,9 @@ const styles = StyleSheet.create({
   },
   locationName: {
     fontWeight: '500',
+  },
+  locationLink: {
+    textDecorationLine: 'underline',
   },
   locationAddress: {
     opacity: 0.7,

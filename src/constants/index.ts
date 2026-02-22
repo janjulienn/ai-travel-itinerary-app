@@ -146,6 +146,11 @@ export const STATUS_CONFIG = {
     color: '#FF9800',
     icon: 'loading',
   },
+  updating: {
+    label: 'Updating',
+    color: '#03A9F4',
+    icon: 'loading',
+  },
   ready: {
     label: 'Ready',
     color: '#4CAF50',

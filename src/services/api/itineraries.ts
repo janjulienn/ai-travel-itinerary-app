@@ -6,10 +6,11 @@ import type {
   IItineraryDetail,
   IItineraryCreateRequest,
   IItineraryAsyncAccepted,
+  IItineraryAdjustmentAsyncAccepted,
   IActivityAddRequest,
   IActivityReplaceRequest,
   IActivityDeleteRequest,
-  IItineraryAdjustmentResponse,
+  IItineraryAdjustmentHistoryItem,
 } from '../../types/dtos/itinerary';
 
 export const itinerariesApi = {
@@ -60,26 +61,39 @@ export const itinerariesApi = {
    * Add a new activity to a day
    * POST /itineraries/{id}/add-activity/
    */
-  addActivity: async (id: string, data: IActivityAddRequest): Promise<IItineraryAdjustmentResponse> => {
-    // No timeout - AI adjustment may take a while
-    return apiClient.post<IItineraryAdjustmentResponse>(`/itineraries/${id}/add-activity/`, data, { timeout: 0 });
+  addActivity: async (id: string, data: IActivityAddRequest): Promise<IItineraryAdjustmentAsyncAccepted> => {
+    return apiClient.post<IItineraryAdjustmentAsyncAccepted>(`/itineraries/${id}/add-activity/`, data);
   },
 
   /**
    * Replace an existing activity
    * POST /itineraries/{id}/replace-activity/
    */
-  replaceActivity: async (id: string, data: IActivityReplaceRequest): Promise<IItineraryAdjustmentResponse> => {
-    // No timeout - AI adjustment may take a while
-    return apiClient.post<IItineraryAdjustmentResponse>(`/itineraries/${id}/replace-activity/`, data, { timeout: 0 });
+  replaceActivity: async (id: string, data: IActivityReplaceRequest): Promise<IItineraryAdjustmentAsyncAccepted> => {
+    return apiClient.post<IItineraryAdjustmentAsyncAccepted>(`/itineraries/${id}/replace-activity/`, data);
   },
 
   /**
    * Delete an activity
    * POST /itineraries/{id}/delete-activity/
    */
-  deleteActivity: async (id: string, data: IActivityDeleteRequest): Promise<IItineraryAdjustmentResponse> => {
-    // No timeout - AI adjustment may take a while
-    return apiClient.post<IItineraryAdjustmentResponse>(`/itineraries/${id}/delete-activity/`, data, { timeout: 0 });
+  deleteActivity: async (id: string, data: IActivityDeleteRequest): Promise<IItineraryAdjustmentAsyncAccepted> => {
+    return apiClient.post<IItineraryAdjustmentAsyncAccepted>(`/itineraries/${id}/delete-activity/`, data);
+  },
+
+  /**
+   * List adjustment history for an itinerary
+   * GET /itineraries/{id}/adjustments/
+   */
+  listAdjustments: async (id: string): Promise<IItineraryAdjustmentHistoryItem[]> => {
+    return apiClient.get<IItineraryAdjustmentHistoryItem[]>(`/itineraries/${id}/adjustments/`);
+  },
+
+  /**
+   * Mark completed unseen adjustments as seen
+   * POST /itineraries/{id}/adjustments/mark-seen/
+   */
+  markAdjustmentsSeen: async (id: string): Promise<{ updated: number }> => {
+    return apiClient.post<{ updated: number }>(`/itineraries/${id}/adjustments/mark-seen/`);
   },
 };
