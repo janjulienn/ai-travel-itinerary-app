@@ -11,6 +11,7 @@ import { ErrorCard } from '../../components/common/ErrorCard';
 import { useProvinces } from '../../hooks/useProvinces';
 import { itinerariesApi } from '../../services/api/itineraries';
 import { addPendingItinerary } from '../../services/pendingItineraries';
+import { useApp } from '../../store/store';
 import type { GenerateStackParamList } from '../../types/navigation';
 import type { IItineraryCreateRequest } from '../../types/dtos/itinerary';
 
@@ -21,6 +22,7 @@ export default function GenerateScreen() {
   const navigation = useNavigation<NavigationProp>();
   const theme = useTheme();
   const route = useRoute<RoutePropType>();
+  const { state } = useApp();
   const { provinces } = useProvinces();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -41,7 +43,9 @@ export default function GenerateScreen() {
       
       const itinerary = await itinerariesApi.createItinerary(data);
 
-      await addPendingItinerary(itinerary.id);
+      if (state.isGuest) {
+        await addPendingItinerary(itinerary.id);
+      }
 
       setWizardResetKey((prev) => prev + 1);
       navigation.navigate(

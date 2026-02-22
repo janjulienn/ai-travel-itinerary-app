@@ -7,6 +7,7 @@ import type { ThemeMode } from '../types/application';
 import type { IAuthResponse } from '../types/dtos/auth';
 import { apiClient } from '../services/api/apiClient';
 import { authApi } from '../services/api/auth';
+import { clearPendingItineraries } from '../services/pendingItineraries';
 
 const TOKEN_STORAGE_KEY = '@ai_travel_itinerary/token';
 const REFRESH_TOKEN_STORAGE_KEY = '@ai_travel_itinerary/refresh_token';
@@ -159,6 +160,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     dispatch({ type: 'LOGOUT' });
     await AsyncStorage.removeItem(TOKEN_STORAGE_KEY);
     await AsyncStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+    await clearPendingItineraries();
   };
 
   const continueAsGuest = () => {

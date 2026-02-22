@@ -7,11 +7,12 @@ import {
 import type { ActivityCategory, ItineraryStatus } from '../types/dtos/itinerary';
 
 const palette = {
-  coral: '#EB5E55',
-  charcoal: '#3A3335',
-  raspberry: '#D81E5B',
-  cream: '#FDF0D5',
-  sage: '#C6D8D3',
+  neutralLight: '#E8EEF2',
+  tertiarySoft: '#D6C9C9',
+  secondarySoft: '#C7D3DD',
+  primaryBlue: '#77B6EA',
+  neutralDark: '#37393A',
+  error: '#D98989',
 };
 
 const withAlpha = (hexColor: string, alpha: number): string => {
@@ -74,31 +75,31 @@ export const lightTheme: MD3Theme = {
   roundness: 12,
   colors: {
     ...MD3LightTheme.colors,
-    primary: palette.raspberry,
-    onPrimary: palette.cream,
-    primaryContainer: withAlpha(palette.raspberry, 0.18),
-    onPrimaryContainer: palette.charcoal,
-    secondary: palette.coral,
-    onSecondary: palette.cream,
-    secondaryContainer: withAlpha(palette.coral, 0.2),
-    onSecondaryContainer: palette.charcoal,
-    tertiary: palette.sage,
-    onTertiary: palette.charcoal,
-    tertiaryContainer: withAlpha(palette.sage, 0.28),
-    onTertiaryContainer: palette.charcoal,
-    error: palette.coral,
-    background: palette.cream,
-    onBackground: palette.charcoal,
-    surface: '#FFF8E8',
-    onSurface: palette.charcoal,
-    surfaceVariant: withAlpha(palette.sage, 0.3),
-    onSurfaceVariant: '#4F474A',
-    outline: withAlpha(palette.charcoal, 0.35),
-    outlineVariant: withAlpha(palette.charcoal, 0.18),
-    surfaceDisabled: withAlpha(palette.charcoal, 0.08),
-    onSurfaceDisabled: withAlpha(palette.charcoal, 0.45),
-    scrim: withAlpha(palette.charcoal, 0.75),
-    backdrop: withAlpha(palette.charcoal, 0.58),
+    primary: palette.primaryBlue,
+    onPrimary: palette.neutralDark,
+    primaryContainer: withAlpha(palette.primaryBlue, 0.16),
+    onPrimaryContainer: palette.neutralDark,
+    secondary: palette.secondarySoft,
+    onSecondary: palette.neutralDark,
+    secondaryContainer: withAlpha(palette.secondarySoft, 0.32),
+    onSecondaryContainer: palette.neutralDark,
+    tertiary: palette.tertiarySoft,
+    onTertiary: palette.neutralDark,
+    tertiaryContainer: withAlpha(palette.tertiarySoft, 0.5),
+    onTertiaryContainer: palette.neutralDark,
+    error: palette.error,
+    background: palette.neutralLight,
+    onBackground: palette.neutralDark,
+    surface: '#F6F8FA',
+    onSurface: palette.neutralDark,
+    surfaceVariant: withAlpha(palette.secondarySoft, 0.65),
+    onSurfaceVariant: '#4A586D',
+    outline: withAlpha(palette.neutralDark, 0.34),
+    outlineVariant: withAlpha(palette.neutralDark, 0.16),
+    surfaceDisabled: withAlpha(palette.neutralDark, 0.08),
+    onSurfaceDisabled: withAlpha(palette.neutralDark, 0.45),
+    scrim: withAlpha(palette.neutralDark, 0.72),
+    backdrop: withAlpha(palette.neutralDark, 0.56),
   },
   fonts: {
     ...MD3LightTheme.fonts,
@@ -111,31 +112,31 @@ export const darkTheme: MD3Theme = {
   roundness: 12,
   colors: {
     ...MD3DarkTheme.colors,
-    primary: palette.sage,
-    onPrimary: palette.charcoal,
-    primaryContainer: withAlpha(palette.sage, 0.24),
-    onPrimaryContainer: palette.cream,
-    secondary: palette.coral,
-    onSecondary: palette.charcoal,
-    secondaryContainer: withAlpha(palette.coral, 0.28),
-    onSecondaryContainer: palette.cream,
-    tertiary: palette.raspberry,
-    onTertiary: palette.cream,
-    tertiaryContainer: withAlpha(palette.raspberry, 0.26),
-    onTertiaryContainer: palette.cream,
-    error: palette.coral,
-    background: palette.charcoal,
-    onBackground: palette.cream,
-    surface: '#443C3F',
-    onSurface: palette.cream,
-    surfaceVariant: '#544B4F',
-    onSurfaceVariant: withAlpha(palette.cream, 0.86),
-    outline: withAlpha(palette.sage, 0.65),
-    outlineVariant: withAlpha(palette.sage, 0.34),
-    surfaceDisabled: withAlpha(palette.cream, 0.12),
-    onSurfaceDisabled: withAlpha(palette.cream, 0.42),
-    scrim: withAlpha(palette.charcoal, 0.88),
-    backdrop: withAlpha(palette.charcoal, 0.72),
+    primary: palette.primaryBlue,
+    onPrimary: palette.neutralDark,
+    primaryContainer: withAlpha(palette.primaryBlue, 0.34),
+    onPrimaryContainer: palette.neutralLight,
+    secondary: palette.secondarySoft,
+    onSecondary: palette.neutralDark,
+    secondaryContainer: withAlpha(palette.secondarySoft, 0.24),
+    onSecondaryContainer: palette.neutralLight,
+    tertiary: palette.tertiarySoft,
+    onTertiary: palette.neutralDark,
+    tertiaryContainer: withAlpha(palette.tertiarySoft, 0.24),
+    onTertiaryContainer: palette.neutralLight,
+    error: palette.error,
+    background: palette.neutralDark,
+    onBackground: palette.neutralLight,
+    surface: '#434648',
+    onSurface: palette.neutralLight,
+    surfaceVariant: '#505456',
+    onSurfaceVariant: palette.secondarySoft,
+    outline: withAlpha(palette.neutralLight, 0.56),
+    outlineVariant: withAlpha(palette.neutralLight, 0.3),
+    surfaceDisabled: withAlpha(palette.neutralLight, 0.12),
+    onSurfaceDisabled: withAlpha(palette.neutralLight, 0.44),
+    scrim: withAlpha('#0F141D', 0.86),
+    backdrop: withAlpha('#0F141D', 0.7),
   },
   fonts: {
     ...MD3DarkTheme.fonts,
@@ -159,27 +160,38 @@ type ActivityCategoryColorToken =
   | 'primary'
   | 'secondary'
   | 'tertiary'
+  | 'onSecondaryContainer'
+  | 'onTertiaryContainer'
   | 'onSurfaceVariant'
   | 'outline';
 
 const activityCategoryColorMap: Record<ActivityCategory, ActivityCategoryColorToken> = {
-  breakfast: 'secondary',
-  lunch: 'secondary',
-  dinner: 'secondary',
-  merienda: 'secondary',
-  food_trip: 'secondary',
+  breakfast: 'tertiary',
+  lunch: 'tertiary',
+  dinner: 'tertiary',
+  merienda: 'tertiary',
+  food_trip: 'tertiary',
   sightseeing: 'primary',
-  activity: 'tertiary',
-  nature: 'tertiary',
+  activity: 'secondary',
+  nature: 'secondary',
   cultural: 'primary',
-  beach: 'tertiary',
+  beach: 'secondary',
   travel: 'onSurfaceVariant',
   check_in: 'onSurfaceVariant',
-  free_time: 'outline',
+  free_time: 'onSurfaceVariant',
 };
 
 export const getActivityCategoryColor = (theme: MD3Theme, category: ActivityCategory): string => {
   const colorToken = activityCategoryColorMap[category] || 'primary';
+
+  if (!theme.dark && colorToken === 'secondary') {
+    return theme.colors.onSecondaryContainer;
+  }
+
+  if (!theme.dark && colorToken === 'tertiary') {
+    return theme.colors.onTertiaryContainer;
+  }
+
   return theme.colors[colorToken];
 };
 
@@ -195,7 +207,7 @@ export const getStatusConfig = (theme: MD3Theme, status: ItineraryStatus): Statu
     generating: {
       label: 'Generating',
       icon: 'loading',
-      color: theme.colors.secondary,
+      color: theme.dark ? theme.colors.secondary : theme.colors.onSecondaryContainer,
       containerColor: withAlpha(theme.colors.secondary, theme.dark ? 0.3 : 0.18),
     },
     updating: {
@@ -207,7 +219,7 @@ export const getStatusConfig = (theme: MD3Theme, status: ItineraryStatus): Statu
     ready: {
       label: 'Ready',
       icon: 'check-circle',
-      color: theme.colors.tertiary,
+      color: theme.dark ? theme.colors.tertiary : theme.colors.onTertiaryContainer,
       containerColor: withAlpha(theme.colors.tertiary, theme.dark ? 0.34 : 0.24),
     },
     failed: {

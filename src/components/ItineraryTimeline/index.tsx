@@ -390,10 +390,21 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
                 )}
                 style={[
                   styles.accordion,
-                  isExpanded && { backgroundColor: theme.colors.primaryContainer },
+                  {
+                    backgroundColor: isExpanded ? theme.colors.surface : theme.colors.background,
+                    borderColor: theme.colors.outlineVariant,
+                  },
                 ]}
-                titleStyle={styles.accordionTitle}
-                descriptionStyle={styles.accordionDescription}
+                titleStyle={[
+                  styles.accordionTitle,
+                  { color: theme.colors.onSurface },
+                  !isExpanded && styles.accordionTitleCollapsed,
+                ]}
+                descriptionStyle={[
+                  styles.accordionDescription,
+                  { color: theme.colors.onSurfaceVariant },
+                  !isExpanded && styles.accordionDescriptionCollapsed,
+                ]}
               >
                 <View style={styles.dayContent}>
                   {day.summary && (
@@ -526,6 +537,7 @@ const styles = StyleSheet.create({
   },
   accordion: {
     paddingVertical: 8,
+    borderBottomWidth: 1,
   },
   accordionLeftIcon: {
     width: 40,
@@ -536,9 +548,15 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
+  accordionTitleCollapsed: {
+    fontWeight: '800',
+  },
   accordionDescription: {
     fontSize: 16,
     marginTop: 4,
+  },
+  accordionDescriptionCollapsed: {
+    fontWeight: '600',
   },
   dayContent: {
     paddingVertical: 12,

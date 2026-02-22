@@ -41,3 +41,7 @@ export const removePendingItinerary = async (id: string): Promise<void> => {
   const next = current.filter((item) => item.id !== id);
   await AsyncStorage.setItem(PENDING_ITINERARIES_KEY, JSON.stringify(next));
 };
+
+export const clearPendingItineraries = async (): Promise<void> => {
+  await AsyncStorage.removeItem(PENDING_ITINERARIES_KEY);
+};

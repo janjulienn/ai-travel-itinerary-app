@@ -13,6 +13,7 @@ import { AdjustmentSummaryModal } from '../../components/AdjustmentSummaryModal'
 import { useItineraryDetail } from '../../hooks/useItineraries';
 import { itinerariesApi } from '../../services/api/itineraries';
 import { addPendingItinerary } from '../../services/pendingItineraries';
+import { useApp } from '../../store/store';
 import { getStatusConfig } from '../../theme';
 import type { TripsStackParamList } from '../../types/navigation';
 import type {
@@ -33,6 +34,7 @@ export default function ItineraryDetailScreen() {
   const route = useRoute<RouteProps>();
   const navigation = useNavigation();
   const isFocused = useIsFocused();
+  const { state } = useApp();
   const theme = useTheme();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -219,7 +221,9 @@ export default function ItineraryDetailScreen() {
       setEditLoading(true);
       setEditError(null);
       const response = await itinerariesApi.regenerateItinerary(route.params.id);
-      await addPendingItinerary(response.id);
+      if (state.isGuest) {
+        await addPendingItinerary(response.id);
+      }
       await refresh();
       (navigation as any).navigate('Trips', {
         toastMessage: 'Itinerary update is ongoing. You can check back shortly.',
@@ -319,7 +323,7 @@ export default function ItineraryDetailScreen() {
           {
             top: insets.top,
             minHeight: stickyRowHeight,
-            backgroundColor: theme.colors.primaryContainer,
+            backgroundColor: theme.colors.surface,
             borderColor: theme.colors.outlineVariant,
           },
         ]}
