@@ -1,5 +1,3 @@
-// Home screen - country selection
-
 import React from 'react';
 import {
   View,
@@ -8,33 +6,39 @@ import {
   RefreshControl,
   NativeSyntheticEvent,
   NativeScrollEvent,
-  Pressable,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, Searchbar,ActivityIndicator, useTheme } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import { Text, Searchbar, ActivityIndicator, useTheme } from 'react-native-paper';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
 import { ErrorCard } from '../../components/common/ErrorCard';
-import { useCountries } from '../../hooks/useProvinces';
+import { ProvinceCard } from '../../components/ProvinceCard';
+import { useProvinces } from '../../hooks/useProvinces';
 import type { HomeStackParamList } from '../../types/navigation';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList>;
+type RouteProps = RouteProp<HomeStackParamList, 'CountryProvinces'>;
 
-export default function HomeScreen() {
+export default function CountryProvincesScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProps>();
   const theme = useTheme();
-  const { countries, loading, error, refresh } = useCountries();
+
+  const countrySlug = route.params.countrySlug;
+  const countryName = route.params.countryName;
+  const { provinces, loading, error, refresh } = useProvinces(countrySlug);
+
   const [searchQuery, setSearchQuery] = React.useState('');
   const [showPullToRefreshHint, setShowPullToRefreshHint] = React.useState(false);
 
-  const filteredCountries = (countries || []).filter((country) =>
-    country.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    country.code.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredProvinces = (provinces || []).filter((province) =>
+    province.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    province.region_display.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleCountryPress = (countrySlug: string, countryName: string) => {
-    navigation.navigate('CountryProvinces', { countrySlug, countryName });
+  const handleProvincePress = (slug: string) => {
+    navigation.navigate('ProvinceDetail', { countrySlug, slug });
   };
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -42,7 +46,7 @@ export default function HomeScreen() {
     setShowPullToRefreshHint(offsetY < -24 && !loading);
   };
 
-  if (loading && (!countries || countries.length === 0)) {
+  if (loading && (!provinces || provinces.length === 0)) {
     return (
       <SafeAreaView style={styles.centerContainer} edges={['top']}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -53,7 +57,7 @@ export default function HomeScreen() {
     );
   }
 
-  if (error && (!countries || countries.length === 0)) {
+  if (error && (!provinces || provinces.length === 0)) {
     return (
       <SafeAreaView style={styles.centerContainer} edges={['top']}>
         <ErrorCard message={error} onRetry={refresh} />
@@ -63,25 +67,22 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
-      {/* Hero Section */}
       <View style={styles.hero}>
-        <Text variant="headlineLarge" style={styles.heroTitle}>
-          Where do you want to go?
+        <Text variant="headlineMedium" style={styles.heroTitle}>
+          {countryName}
         </Text>
-        <Text variant="bodyLarge" style={styles.heroSubtitle}>
-          Explore countries first, then discover top destination provinces
+        <Text variant="bodyMedium" style={styles.heroSubtitle}>
+          Pick a destination province to explore
         </Text>
       </View>
 
-      {/* Search */}
       <Searchbar
-        placeholder="Search countries..."
+        placeholder="Search provinces..."
         onChangeText={setSearchQuery}
         value={searchQuery}
         style={styles.searchBar}
       />
 
-      {/* Country List */}
       {showPullToRefreshHint && (
         <View
           style={[
@@ -90,44 +91,16 @@ export default function HomeScreen() {
           ]}
         >
           <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-            Pull down to refresh countries
+            Pull down to refresh destinations
           </Text>
         </View>
       )}
+
       <FlatList
-        data={filteredCountries}
+        data={filteredProvinces}
         keyExtractor={(item) => item.slug}
         renderItem={({ item }) => (
-          <Pressable
-            onPress={() => handleCountryPress(item.slug, item.name)}
-            style={[styles.countryCard, { backgroundColor: theme.colors.surface }]}
-          >
-            {!!(item.image_url || item.photos?.[0]) && (
-              <Image
-                source={{ uri: item.image_url || item.photos?.[0] }}
-                style={styles.countryImage}
-                resizeMode="cover"
-              />
-            )}
-            <Text variant="titleMedium" style={styles.countryName}>
-              {item.name}
-            </Text>
-            <Text
-              variant="bodyMedium"
-              style={[styles.countryCode, { color: theme.colors.onSurfaceVariant }]}
-            >
-              {item.code}
-            </Text>
-            {!!item.description && (
-              <Text
-                variant="bodySmall"
-                numberOfLines={2}
-                style={[styles.countryDescription, { color: theme.colors.onSurfaceVariant }]}
-              >
-                {item.description}
-              </Text>
-            )}
-          </Pressable>
+          <ProvinceCard province={item} onPress={() => handleProvincePress(item.slug)} />
         )}
         numColumns={1}
         contentContainerStyle={styles.list}
@@ -144,7 +117,7 @@ export default function HomeScreen() {
         }
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text variant="bodyLarge">No countries found</Text>
+            <Text variant="bodyLarge">No destinations found</Text>
           </View>
         }
       />
@@ -167,13 +140,13 @@ const styles = StyleSheet.create({
   },
   hero: {
     padding: 24,
-    paddingBottom: 16,
+    paddingBottom: 12,
   },
   heroTitle: {
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontWeight: '700',
   },
   heroSubtitle: {
+    marginTop: 6,
     opacity: 0.7,
   },
   searchBar: {
@@ -183,29 +156,6 @@ const styles = StyleSheet.create({
   },
   list: {
     padding: 8,
-  },
-  countryCard: {
-    borderRadius: 12,
-    marginHorizontal: 8,
-    marginVertical: 6,
-    padding: 12,
-    overflow: 'hidden',
-  },
-  countryImage: {
-    width: '100%',
-    height: 120,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  countryName: {
-    fontWeight: '700',
-  },
-  countryCode: {
-    marginTop: 4,
-  },
-  countryDescription: {
-    marginTop: 8,
-    lineHeight: 18,
   },
   pullHintContainer: {
     alignSelf: 'center',

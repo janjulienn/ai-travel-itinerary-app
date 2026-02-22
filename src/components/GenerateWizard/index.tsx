@@ -14,12 +14,14 @@ import {
 } from 'react-native-paper';
 import { DatePickerModal } from 'react-native-paper-dates';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import type { IProvinceList } from '../../types/dtos/province';
+import { useProvinces } from '../../hooks/useProvinces';
+import type { ICountry, IProvinceList } from '../../types/dtos/province';
 import type { IItineraryCreateRequest, BudgetRange, Pace, GroupType } from '../../types/dtos/itinerary';
 import { BUDGET_OPTIONS, PACE_OPTIONS, GROUP_TYPE_OPTIONS, INTEREST_OPTIONS, MAX_SPECIAL_NOTES_LENGTH } from '../../constants';
 
 interface GenerateWizardProps {
-  provinces: IProvinceList[];
+  countries: ICountry[];
+  initialCountrySlug?: string;
   initialProvinceSlug?: string;
   onGenerate: (data: IItineraryCreateRequest) => void;
   loading?: boolean;
@@ -27,7 +29,8 @@ interface GenerateWizardProps {
 }
 
 export const GenerateWizard: React.FC<GenerateWizardProps> = ({
-  provinces,
+  countries,
+  initialCountrySlug,
   initialProvinceSlug,
   onGenerate,
   loading = false,
@@ -42,17 +45,24 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
   const [step, setStep] = useState(1);
 
   // Step 1 - Where & When
+  const [countrySlug, setCountrySlug] = useState(initialCountrySlug || '');
   const [provinceSlug, setProvinceSlug] = useState(initialProvinceSlug || '');
+  const { provinces, loading: provincesLoading } = useProvinces(countrySlug);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [dateRange, setDateRange] = useState<{ startDate: Date | undefined; endDate: Date | undefined }>({
     startDate: undefined,
     endDate: undefined,
   });
 
+  useEffect(() => {
+    if (initialCountrySlug) {
+      setCountrySlug(initialCountrySlug);
+    }
+  }, [initialCountrySlug]);
+
   // Update provinceSlug when initialProvinceSlug changes (navigation from province detail)
   useEffect(() => {
     if (initialProvinceSlug) {
-      console.log('Setting provinceSlug from initialProvinceSlug:', initialProvinceSlug);
       setProvinceSlug(initialProvinceSlug);
     }
   }, [initialProvinceSlug]);
@@ -63,8 +73,7 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
       const today = new Date();
       const threeDaysLater = new Date(today);
       threeDaysLater.setDate(today.getDate() + 3);
-      
-      console.log('Setting default dates:', today, 'to', threeDaysLater);
+
       setDateRange({
         startDate: today,
         endDate: threeDaysLater,
@@ -74,7 +83,7 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
 
   // Reset wizard when initialProvinceSlug changes (navigation from province detail)
   useEffect(() => {
-    if (initialProvinceSlug) {
+    if (initialProvinceSlug || initialCountrySlug) {
       setStep(1);
       setGroupType(undefined);
       setGroupSize(1);
@@ -83,7 +92,22 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
       setInterests([]);
       setSpecialNotes('');
     }
-  }, [initialProvinceSlug]);
+  }, [initialProvinceSlug, initialCountrySlug]);
+
+  useEffect(() => {
+    if (!countrySlug) {
+      setProvinceSlug('');
+      return;
+    }
+
+    if (provincesLoading) {
+      return;
+    }
+
+    if (provinceSlug && !(provinces || []).some((p) => p.slug === provinceSlug)) {
+      setProvinceSlug('');
+    }
+  }, [countrySlug, provinces, provinceSlug, provincesLoading]);
 
   // Step 2 - Trip Details
   const [groupType, setGroupType] = useState<GroupType | undefined>();
@@ -106,6 +130,7 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
     if (resetTrigger <= 0) return;
 
     setStep(1);
+    setCountrySlug('');
     setProvinceSlug('');
     setDatePickerOpen(false);
     setDateRange({ startDate: undefined, endDate: undefined });
@@ -117,7 +142,7 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
     setSpecialNotes('');
   }, [resetTrigger]);
 
-  const canProceedStep1 = provinceSlug && dateRange.startDate && dateRange.endDate;
+  const canProceedStep1 = countrySlug && provinceSlug && dateRange.startDate && dateRange.endDate;
   const selectedProvince = (provinces || []).find((p) => p.slug === provinceSlug);
 
   const handleDateConfirm = ({ startDate, endDate }: any) => {
@@ -135,6 +160,7 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
     if (!dateRange.startDate || !dateRange.endDate) return;
 
     const data: IItineraryCreateRequest = {
+      country: countrySlug,
       province: provinceSlug,
       start_date: dateRange.startDate.toISOString().split('T')[0],
       end_date: dateRange.endDate.toISOString().split('T')[0],
@@ -181,9 +207,36 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
 
             {/* Province Selection */}
             <Text variant="titleMedium" style={styles.label}>
+              Country
+            </Text>
+            <View style={styles.provinceGrid}>
+              {(countries || []).map((country) => (
+                <Chip
+                  key={country.slug}
+                  selected={countrySlug === country.slug}
+                  onPress={() => setCountrySlug(country.slug)}
+                  style={[
+                    styles.provinceChip,
+                    countrySlug === country.slug && selectedChipStyle,
+                  ]}
+                  textStyle={countrySlug === country.slug ? selectedChipTextStyle : undefined}
+                  showSelectedCheck
+                  mode={countrySlug === country.slug ? 'flat' : 'outlined'}
+                >
+                  {country.name}
+                </Chip>
+              ))}
+            </View>
+
+            <Text variant="titleMedium" style={[styles.label, { marginTop: 24 }] }>
               Destination
             </Text>
             <View style={styles.provinceGrid}>
+              {provincesLoading && (
+                <Text variant="bodySmall" style={styles.provinceInfo}>
+                  Loading destinations...
+                </Text>
+              )}
               {(provinces || []).map((province) => (
                 <Chip
                   key={province.slug}

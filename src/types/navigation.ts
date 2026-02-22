@@ -11,11 +11,12 @@ export type RootTabParamList = {
 
 export type HomeStackParamList = {
   Home: undefined;
-  ProvinceDetail: { slug: string };
+  CountryProvinces: { countrySlug: string; countryName: string };
+  ProvinceDetail: { countrySlug: string; slug: string };
 };
 
 export type GenerateStackParamList = {
-  Generate: { provinceSlug?: string };
+  Generate: { countrySlug?: string; provinceSlug?: string };
 };
 
 export type TripsStackParamList = {

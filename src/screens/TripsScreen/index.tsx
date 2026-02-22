@@ -41,6 +41,7 @@ export default function TripsScreen() {
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const [toastMessage, setToastMessage] = React.useState<string | null>(null);
+  const [generatingDotsPhase, setGeneratingDotsPhase] = React.useState(1);
 
   React.useEffect(() => {
     const message = route.params?.toastMessage;
@@ -74,6 +75,20 @@ export default function TripsScreen() {
 
     return () => clearInterval(timer);
   }, [itineraries, refresh]);
+
+  React.useEffect(() => {
+    const hasGenerating = itineraries.some((item) => item.status === 'generating');
+    if (!hasGenerating) {
+      setGeneratingDotsPhase(1);
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setGeneratingDotsPhase((prev) => (prev % 3) + 1);
+    }, 450);
+
+    return () => clearInterval(timer);
+  }, [itineraries]);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetY = event.nativeEvent.contentOffset.y;
@@ -234,6 +249,7 @@ export default function TripsScreen() {
             onPress={() => handleItineraryPress(item.id)}
             onDelete={state.isGuest ? undefined : () => handleDeletePress(item)}
             deleting={isDeleting && itineraryToDelete?.id === item.id}
+            generatingDotsPhase={generatingDotsPhase}
           />
         )}
         contentContainerStyle={[styles.list, { paddingTop: insets.top + 8 }]}

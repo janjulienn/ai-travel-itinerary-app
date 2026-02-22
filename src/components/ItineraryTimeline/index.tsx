@@ -57,6 +57,7 @@ const isTransitActivity = (activity: IItineraryActivity): boolean => {
 interface ItineraryTimelineProps {
   days: IItineraryDay[];
   itineraryId: string;
+  provinceCountrySlug: string;
   provinceSlug: string;
   provinceName: string;
   onActivityAdded?: (dayId: number, data: any) => Promise<void>;
@@ -83,6 +84,7 @@ interface IAdjacentActivitySummary {
 export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
   days,
   itineraryId,
+  provinceCountrySlug,
   provinceSlug,
   provinceName,
   onActivityAdded,
@@ -508,6 +510,7 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
           setActivityBeingReplaced(null);
         }}
         onSave={handleSavePlace}
+        countrySlug={provinceCountrySlug}
         provinceSlug={provinceSlug}
         provinceName={provinceName}
         mode={searchMode}

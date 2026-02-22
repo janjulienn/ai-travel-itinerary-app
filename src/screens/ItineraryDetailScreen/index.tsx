@@ -475,6 +475,7 @@ export default function ItineraryDetailScreen() {
           <ItineraryTimeline
             days={itinerary.days}
             itineraryId={itinerary.id}
+            provinceCountrySlug={itinerary.province_country_slug}
             provinceSlug={itinerary.province_slug}
             provinceName={itinerary.province_name}
             onActivityAdded={handleActivityAdded}

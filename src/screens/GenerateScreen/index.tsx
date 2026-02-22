@@ -8,7 +8,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from 'react-native-paper';
 import { GenerateWizard } from '../../components/GenerateWizard';
 import { ErrorCard } from '../../components/common/ErrorCard';
-import { useProvinces } from '../../hooks/useProvinces';
+import { useCountries } from '../../hooks/useProvinces';
 import { itinerariesApi } from '../../services/api/itineraries';
 import { addPendingItinerary } from '../../services/pendingItineraries';
 import { useApp } from '../../store/store';
@@ -23,11 +23,24 @@ export default function GenerateScreen() {
   const theme = useTheme();
   const route = useRoute<RoutePropType>();
   const { state } = useApp();
-  const { provinces } = useProvinces();
+  const initialCountrySlug = route.params?.countrySlug;
+  const initialProvinceSlug = route.params?.provinceSlug;
+  const { countries } = useCountries();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [lastRequestData, setLastRequestData] = useState<IItineraryCreateRequest | null>(null);
   const [wizardResetKey, setWizardResetKey] = useState(0);
+  const [prefillCountrySlug, setPrefillCountrySlug] = useState(initialCountrySlug);
+  const [prefillProvinceSlug, setPrefillProvinceSlug] = useState(initialProvinceSlug);
+
+  React.useEffect(() => {
+    if (!initialCountrySlug && !initialProvinceSlug) {
+      return;
+    }
+
+    setPrefillCountrySlug(initialCountrySlug);
+    setPrefillProvinceSlug(initialProvinceSlug);
+  }, [initialCountrySlug, initialProvinceSlug]);
 
   useFocusEffect(
     useCallback(() => {
@@ -47,7 +60,11 @@ export default function GenerateScreen() {
         await addPendingItinerary(itinerary.id);
       }
 
+      setPrefillCountrySlug(undefined);
+      setPrefillProvinceSlug(undefined);
       setWizardResetKey((prev) => prev + 1);
+      navigation.setParams({ countrySlug: undefined, provinceSlug: undefined } as never);
+
       navigation.navigate(
         'TripsTab',
         {
@@ -88,8 +105,9 @@ export default function GenerateScreen() {
           />
         ) : (
           <GenerateWizard
-            provinces={provinces}
-            initialProvinceSlug={route.params?.provinceSlug}
+            countries={countries}
+            initialCountrySlug={prefillCountrySlug}
+            initialProvinceSlug={prefillProvinceSlug}
             onGenerate={handleGenerate}
             loading={loading}
             resetTrigger={wizardResetKey}

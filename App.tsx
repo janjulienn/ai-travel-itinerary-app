@@ -16,6 +16,7 @@ import { darkTheme, lightTheme, navigationThemes } from './src/theme';
 
 // Screens
 import HomeScreen from './src/screens/HomeScreen';
+import CountryProvincesScreen from './src/screens/CountryProvincesScreen';
 import ProvinceDetailScreen from './src/screens/ProvinceDetailScreen';
 import GenerateScreen from './src/screens/GenerateScreen';
 import TripsScreen from './src/screens/TripsScreen';
@@ -39,6 +40,10 @@ function HomeStackScreen() {
       <HomeStack.Screen
         name="Home"
         component={HomeScreen}
+      />
+      <HomeStack.Screen
+        name="CountryProvinces"
+        component={CountryProvincesScreen}
       />
       <HomeStack.Screen
         name="ProvinceDetail"

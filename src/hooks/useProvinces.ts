@@ -2,18 +2,55 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { provincesApi } from '../services/api/provinces';
-import type { IProvinceList, IProvinceDetail } from '../types/dtos/province';
+import type { ICountry, IProvinceList, IProvinceDetail } from '../types/dtos/province';
 
-export const useProvinces = () => {
+export const useCountries = () => {
+  const [countries, setCountries] = useState<ICountry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchCountries = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await provincesApi.getCountries();
+      setCountries(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch countries');
+      console.error('Error fetching countries:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCountries();
+  }, [fetchCountries]);
+
+  return {
+    countries,
+    loading,
+    error,
+    refresh: fetchCountries,
+  };
+};
+
+export const useProvinces = (countrySlug: string) => {
   const [provinces, setProvinces] = useState<IProvinceList[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchProvinces = useCallback(async () => {
+    if (!countrySlug) {
+      setProvinces([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      const data = await provincesApi.getProvinces();
+      const data = await provincesApi.getProvinces(countrySlug);
       setProvinces(data);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch provinces');
@@ -21,7 +58,7 @@ export const useProvinces = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [countrySlug]);
 
   useEffect(() => {
     fetchProvinces();
@@ -35,18 +72,18 @@ export const useProvinces = () => {
   };
 };
 
-export const useProvinceDetail = (slug: string) => {
+export const useProvinceDetail = (countrySlug: string, slug: string) => {
   const [province, setProvince] = useState<IProvinceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchProvinceDetail = useCallback(async () => {
-    if (!slug) return;
+    if (!countrySlug || !slug) return;
 
     try {
       setLoading(true);
       setError(null);
-      const data = await provincesApi.getProvinceDetail(slug);
+      const data = await provincesApi.getProvinceDetail(countrySlug, slug);
       setProvince(data);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch province details');
@@ -54,7 +91,7 @@ export const useProvinceDetail = (slug: string) => {
     } finally {
       setLoading(false);
     }
-  }, [slug]);
+  }, [countrySlug, slug]);
 
   useEffect(() => {
     fetchProvinceDetail();

@@ -13,6 +13,8 @@ const mapDetailToList = (item: IItineraryDetail): IItineraryList => ({
   id: item.id,
   province_name: item.province_name,
   province_slug: item.province_slug,
+  province_country_name: item.province_country_name,
+  province_country_slug: item.province_country_slug,
   start_date: item.start_date,
   end_date: item.end_date,
   num_days: item.num_days,

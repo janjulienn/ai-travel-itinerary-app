@@ -30,6 +30,7 @@ interface PlaceSearchBottomSheetProps {
     time_end: string;
     duration_minutes: number;
   }) => void;
+  countrySlug: string;
   provinceSlug: string;
   provinceName?: string;
   mode: 'add' | 'replace';
@@ -134,6 +135,7 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
   visible,
   onDismiss,
   onSave,
+  countrySlug,
   provinceSlug,
   provinceName,
   mode,
@@ -238,21 +240,21 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
 
         if (normalizedQuery.length >= 2) {
           if (selectedCategories.length === 1) {
-            data = await provincesApi.autocompleteProvincePlaces(provinceSlug, {
+            data = await provincesApi.autocompleteProvincePlaces(countrySlug, provinceSlug, {
               q: normalizedQuery,
               category: selectedCategories[0],
             });
           } else {
-            data = await provincesApi.autocompleteProvincePlaces(provinceSlug, {
+            data = await provincesApi.autocompleteProvincePlaces(countrySlug, provinceSlug, {
               q: normalizedQuery,
             });
           }
         } else if (selectedCategories.length === 1) {
-          data = await provincesApi.getProvincePlaces(provinceSlug, {
+          data = await provincesApi.getProvincePlaces(countrySlug, provinceSlug, {
             category: selectedCategories[0],
           });
         } else {
-          data = await provincesApi.getProvincePlaces(provinceSlug);
+          data = await provincesApi.getProvincePlaces(countrySlug, provinceSlug);
         }
 
         if (requestSeq === requestSeqRef.current) {
@@ -268,7 +270,7 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
         }
       }
     },
-    [provinceSlug, selectedCategories]
+    [countrySlug, provinceSlug, selectedCategories]
   );
 
   useEffect(() => {

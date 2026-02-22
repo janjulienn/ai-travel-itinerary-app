@@ -20,7 +20,10 @@ export default function ProvinceDetailScreen() {
   const route = useRoute<RouteProps>();
   const navigation = useNavigation<NavigationProp>();
   const theme = useTheme();
-  const { province, loading, error, refresh } = useProvinceDetail(route.params.slug);
+  const { province, loading, error, refresh } = useProvinceDetail(
+    route.params.countrySlug,
+    route.params.slug
+  );
   const [selectedPlace, setSelectedPlace] = useState<IPlace | null>(null);
 
   if (loading && !province) {
@@ -52,7 +55,10 @@ export default function ProvinceDetailScreen() {
   const handlePlanTrip = () => {
     navigation.navigate('GenerateTab', {
       screen: 'Generate',
-      params: { provinceSlug: province.slug },
+      params: {
+        countrySlug: province.country_slug,
+        provinceSlug: province.slug,
+      },
     });
   };
 

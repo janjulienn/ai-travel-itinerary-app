@@ -64,6 +64,8 @@ export interface IItineraryList {
   id: string; // UUID
   province_name: string;
   province_slug: string;
+  province_country_name: string;
+  province_country_slug: string;
   start_date: string; // YYYY-MM-DD
   end_date: string;
   num_days: number;
@@ -85,6 +87,7 @@ export interface IItineraryDetail extends IItineraryList {
 }
 
 export interface IItineraryCreateRequest {
+  country: string; // Country slug
   province: string; // Province slug
   start_date: string; // YYYY-MM-DD
   end_date: string; // YYYY-MM-DD

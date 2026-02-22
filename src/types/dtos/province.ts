@@ -7,6 +7,17 @@ export interface IPlaceHighlight {
   order: number;
 }
 
+export interface ICountry {
+  id: number;
+  code: string;
+  name: string;
+  slug: string;
+  description: string;
+  image_url: string;
+  photos: string[];
+  display_order: number;
+}
+
 export interface IPlace {
   google_place_id: string;
   name: string;
@@ -40,6 +51,9 @@ export interface IProvinceList {
   slug: string;
   region: string;
   region_display: string;
+  country_code: string;
+  country_name: string;
+  country_slug: string;
   description: string;
   image_url: string | null;
   photos: string[];

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, GestureResponderEvent } from 'react-native';
-import { Card, Text, Chip, useTheme, IconButton } from 'react-native-paper';
+import { Card, Text, Chip, useTheme, IconButton, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { IItineraryList } from '../../types/dtos/itinerary';
 import { getStatusConfig } from '../../theme';
@@ -12,6 +12,7 @@ interface ItineraryCardProps {
   onPress: () => void;
   onDelete?: () => void;
   deleting?: boolean;
+  generatingDotsPhase?: number;
 }
 
 export const ItineraryCard: React.FC<ItineraryCardProps> = ({
@@ -19,14 +20,21 @@ export const ItineraryCard: React.FC<ItineraryCardProps> = ({
   onPress,
   onDelete,
   deleting = false,
+  generatingDotsPhase = 1,
 }) => {
   const theme = useTheme();
   const statusConfig = getStatusConfig(theme, itinerary.status);
+
   const displayTitle = itinerary.title?.trim()
     ? itinerary.title
     : itinerary.status === 'generating'
-      ? 'Building your itinerary...'
+      ? `Building your itinerary${'.'.repeat(generatingDotsPhase)}`
       : 'Untitled itinerary';
+
+  const statusIcon =
+    itinerary.status === 'generating'
+      ? () => <ActivityIndicator size={16} color={statusConfig.color} animating />
+      : statusConfig.icon;
 
   const handleDeletePress = (event: GestureResponderEvent) => {
     event.stopPropagation();
@@ -47,7 +55,7 @@ export const ItineraryCard: React.FC<ItineraryCardProps> = ({
                   <View style={[styles.updateDot, { backgroundColor: theme.colors.primary }]} />
                 )}
                 <Chip
-                  icon={statusConfig.icon}
+                  icon={statusIcon}
                   style={[styles.statusChip, { backgroundColor: statusConfig.containerColor }]}
                   textStyle={{ color: statusConfig.color }}
                 >
@@ -71,7 +79,7 @@ export const ItineraryCard: React.FC<ItineraryCardProps> = ({
           <View style={styles.info}>
             <MaterialCommunityIcons name="map-marker" size={20} color={theme.colors.primary} />
             <Text variant="bodyLarge" style={styles.infoText}>
-              {itinerary.province_name}
+              {itinerary.province_name}, {itinerary.province_country_name}
             </Text>
           </View>
 
@@ -118,7 +126,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   statusChip: {
-    height: 28,
+    height: 32,
+    justifyContent: 'center',
   },
   updateDot: {
     width: 10,
