@@ -5,7 +5,7 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Button, useTheme } from 'react-native-paper';
+import { useTheme } from 'react-native-paper';
 import { GenerateWizard } from '../../components/GenerateWizard';
 import { ErrorCard } from '../../components/common/ErrorCard';
 import { useCountries } from '../../hooks/useProvinces';
@@ -49,6 +49,15 @@ export default function GenerateScreen() {
     useCallback(() => {
       setError('');
 
+      if (
+        initialCountrySlug ||
+        initialProvinceSlug ||
+        prefillCountrySlug ||
+        prefillProvinceSlug
+      ) {
+        return;
+      }
+
       if (skipNextAutoClearRef.current) {
         skipNextAutoClearRef.current = false;
         return;
@@ -57,7 +66,12 @@ export default function GenerateScreen() {
       setPrefillCountrySlug(undefined);
       setPrefillProvinceSlug(undefined);
       setWizardResetKey((prev) => prev + 1);
-    }, [])
+    }, [
+      initialCountrySlug,
+      initialProvinceSlug,
+      prefillCountrySlug,
+      prefillProvinceSlug,
+    ])
   );
 
   const handleGenerate = async (data: IItineraryCreateRequest) => {
@@ -118,11 +132,6 @@ export default function GenerateScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
-      <View style={styles.headerActions}>
-        <Button mode="text" icon="refresh" onPress={handleClearForm} compact>
-          Clear form
-        </Button>
-      </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {error ? (
           <ErrorCard
@@ -136,6 +145,7 @@ export default function GenerateScreen() {
             initialCountrySlug={prefillCountrySlug}
             initialProvinceSlug={prefillProvinceSlug}
             onGenerate={handleGenerate}
+            onClearForm={handleClearForm}
             loading={loading}
             resetTrigger={wizardResetKey}
           />
@@ -148,11 +158,6 @@ export default function GenerateScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  headerActions: {
-    alignItems: 'flex-end',
-    paddingHorizontal: 12,
-    paddingTop: 4,
   },
   scrollContent: {
     flexGrow: 1,

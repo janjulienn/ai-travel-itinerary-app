@@ -24,6 +24,7 @@ interface GenerateWizardProps {
   initialCountrySlug?: string;
   initialProvinceSlug?: string;
   onGenerate: (data: IItineraryCreateRequest) => void;
+  onClearForm?: () => void;
   loading?: boolean;
   resetTrigger?: number;
 }
@@ -33,6 +34,7 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
   initialCountrySlug,
   initialProvinceSlug,
   onGenerate,
+  onClearForm,
   loading = false,
   resetTrigger = 0,
 }) => {
@@ -48,6 +50,7 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
   const [countrySlug, setCountrySlug] = useState(initialCountrySlug || '');
   const [provinceSlug, setProvinceSlug] = useState(initialProvinceSlug || '');
   const { provinces, loading: provincesLoading } = useProvinces(countrySlug);
+  const [hasStartedProvinceLoad, setHasStartedProvinceLoad] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [dateRange, setDateRange] = useState<{ startDate: Date | undefined; endDate: Date | undefined }>({
     startDate: undefined,
@@ -96,18 +99,28 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
 
   useEffect(() => {
     if (!countrySlug) {
+      setHasStartedProvinceLoad(false);
       setProvinceSlug('');
       return;
     }
 
     if (provincesLoading) {
+      setHasStartedProvinceLoad(true);
+      return;
+    }
+
+    if (!hasStartedProvinceLoad && (provinces || []).length === 0) {
+      return;
+    }
+
+    if ((provinces || []).some((province) => province.country_slug !== countrySlug)) {
       return;
     }
 
     if (provinceSlug && !(provinces || []).some((p) => p.slug === provinceSlug)) {
       setProvinceSlug('');
     }
-  }, [countrySlug, provinces, provinceSlug, provincesLoading]);
+  }, [countrySlug, provinces, provinceSlug, provincesLoading, hasStartedProvinceLoad]);
 
   // Step 2 - Trip Details
   const [groupType, setGroupType] = useState<GroupType | undefined>();
@@ -202,9 +215,14 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {step === 1 && (
           <View style={styles.step}>
-            <Text variant="headlineSmall" style={styles.stepTitle}>
-              Where & When?
-            </Text>
+            <View style={styles.stepHeader}>
+              <Text variant="headlineSmall" style={styles.stepTitle}>
+                Where & When?
+              </Text>
+              <Button mode="text" icon="refresh" onPress={onClearForm} compact>
+                Clear form
+              </Button>
+            </View>
 
             {/* Province Selection */}
             <Text variant="titleMedium" style={styles.label}>
@@ -215,7 +233,11 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
                 <Chip
                   key={country.slug}
                   selected={countrySlug === country.slug}
-                  onPress={() => setCountrySlug(country.slug)}
+                  onPress={() => {
+                    setCountrySlug(country.slug);
+                    setProvinceSlug('');
+                    setHasStartedProvinceLoad(false);
+                  }}
                   style={[
                     styles.provinceChip,
                     countrySlug === country.slug && selectedChipStyle,
@@ -550,9 +572,14 @@ const styles = StyleSheet.create({
   step: {
     padding: 16,
   },
+  stepHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   stepTitle: {
     fontWeight: 'bold',
-    marginBottom: 8,
   },
   stepSubtitle: {
     opacity: 0.7,
