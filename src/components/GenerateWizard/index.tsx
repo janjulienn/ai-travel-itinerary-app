@@ -143,6 +143,7 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
   }, [resetTrigger]);
 
   const canProceedStep1 = countrySlug && provinceSlug && dateRange.startDate && dateRange.endDate;
+  const selectedCountry = (countries || []).find((c) => c.slug === countrySlug);
   const selectedProvince = (provinces || []).find((p) => p.slug === provinceSlug);
 
   const handleDateConfirm = ({ startDate, endDate }: any) => {
@@ -227,14 +228,29 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
                 </Chip>
               ))}
             </View>
+            {!!selectedCountry?.description && (
+              <Text variant="bodySmall" style={styles.selectionDescription}>
+                {selectedCountry.description}
+              </Text>
+            )}
 
             <Text variant="titleMedium" style={[styles.label, { marginTop: 24 }] }>
               Destination
             </Text>
             <View style={styles.provinceGrid}>
+              {!countrySlug && !provincesLoading && (
+                <Text variant="bodySmall" style={styles.provinceInfo}>
+                  Select a country first to view destination options.
+                </Text>
+              )}
               {provincesLoading && (
                 <Text variant="bodySmall" style={styles.provinceInfo}>
                   Loading destinations...
+                </Text>
+              )}
+              {!!countrySlug && !provincesLoading && (provinces || []).length === 0 && (
+                <Text variant="bodySmall" style={styles.provinceInfo}>
+                  No destinations available for this country right now.
                 </Text>
               )}
               {(provinces || []).map((province) => (
@@ -256,9 +272,16 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
             </View>
 
             {selectedProvince && (
-              <Text variant="bodyMedium" style={styles.provinceInfo}>
-                📍 {selectedProvince.region_display}
-              </Text>
+              <View style={styles.selectedProvinceInfo}>
+                <Text variant="bodyMedium" style={styles.provinceInfo}>
+                  📍 {selectedProvince.region_display}
+                </Text>
+                {!!selectedProvince.description && (
+                  <Text variant="bodySmall" style={styles.selectionDescription}>
+                    {selectedProvince.description}
+                  </Text>
+                )}
+              </View>
             )}
 
             {/* Date Selection */}
@@ -551,6 +574,14 @@ const styles = StyleSheet.create({
   provinceInfo: {
     opacity: 0.7,
     marginTop: 8,
+  },
+  selectedProvinceInfo: {
+    marginTop: 2,
+  },
+  selectionDescription: {
+    opacity: 0.75,
+    marginTop: 2,
+    marginBottom: 2,
   },
   dateButton: {
     marginBottom: 4,

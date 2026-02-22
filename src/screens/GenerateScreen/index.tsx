@@ -1,11 +1,11 @@
 // Generate screen - itinerary generation wizard
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useTheme } from 'react-native-paper';
+import { Button, useTheme } from 'react-native-paper';
 import { GenerateWizard } from '../../components/GenerateWizard';
 import { ErrorCard } from '../../components/common/ErrorCard';
 import { useCountries } from '../../hooks/useProvinces';
@@ -32,6 +32,7 @@ export default function GenerateScreen() {
   const [wizardResetKey, setWizardResetKey] = useState(0);
   const [prefillCountrySlug, setPrefillCountrySlug] = useState(initialCountrySlug);
   const [prefillProvinceSlug, setPrefillProvinceSlug] = useState(initialProvinceSlug);
+  const skipNextAutoClearRef = useRef(false);
 
   React.useEffect(() => {
     if (!initialCountrySlug && !initialProvinceSlug) {
@@ -40,11 +41,22 @@ export default function GenerateScreen() {
 
     setPrefillCountrySlug(initialCountrySlug);
     setPrefillProvinceSlug(initialProvinceSlug);
-  }, [initialCountrySlug, initialProvinceSlug]);
+    skipNextAutoClearRef.current = true;
+    navigation.setParams({ countrySlug: undefined, provinceSlug: undefined } as never);
+  }, [initialCountrySlug, initialProvinceSlug, navigation]);
 
   useFocusEffect(
     useCallback(() => {
       setError('');
+
+      if (skipNextAutoClearRef.current) {
+        skipNextAutoClearRef.current = false;
+        return;
+      }
+
+      setPrefillCountrySlug(undefined);
+      setPrefillProvinceSlug(undefined);
+      setWizardResetKey((prev) => prev + 1);
     }, [])
   );
 
@@ -94,8 +106,23 @@ export default function GenerateScreen() {
     }
   };
 
+  const handleClearForm = () => {
+    setError('');
+    setLastRequestData(null);
+    setPrefillCountrySlug(undefined);
+    setPrefillProvinceSlug(undefined);
+    skipNextAutoClearRef.current = false;
+    setWizardResetKey((prev) => prev + 1);
+    navigation.setParams({ countrySlug: undefined, provinceSlug: undefined } as never);
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
+      <View style={styles.headerActions}>
+        <Button mode="text" icon="refresh" onPress={handleClearForm} compact>
+          Clear form
+        </Button>
+      </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {error ? (
           <ErrorCard
@@ -121,6 +148,11 @@ export default function GenerateScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  headerActions: {
+    alignItems: 'flex-end',
+    paddingHorizontal: 12,
+    paddingTop: 4,
   },
   scrollContent: {
     flexGrow: 1,
