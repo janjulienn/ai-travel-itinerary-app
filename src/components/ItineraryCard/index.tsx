@@ -32,7 +32,7 @@ export const ItineraryCard: React.FC<ItineraryCardProps> = ({
       : 'Untitled itinerary';
 
   const statusIcon =
-    itinerary.status === 'generating'
+    itinerary.status === 'generating' || itinerary.status === 'updating'
       ? () => <ActivityIndicator size={16} color={statusConfig.color} animating />
       : statusConfig.icon;
 

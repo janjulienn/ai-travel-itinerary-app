@@ -57,7 +57,7 @@ export default function ItineraryDetailScreen() {
   const itineraryScrollRef = useRef<ScrollView>(null);
   const seenMarkedRef = useRef(false);
 
-  const historyModalMaxHeight = width >= 768 ? '97%' : '92%';
+  const historyModalMaxHeight = width >= 768 ? '99%' : '96%';
 
   useEffect(() => {
     if (isFocused) {
@@ -387,7 +387,9 @@ export default function ItineraryDetailScreen() {
           <View style={styles.infoRow}>
             <MaterialCommunityIcons name="map-marker" size={20} color={theme.colors.primary} />
             <Text variant="titleMedium" style={styles.infoText}>
-              {itinerary.province_name}
+              {itinerary.province_country_name
+                ? `${itinerary.province_name}, ${itinerary.province_country_name}`
+                : itinerary.province_name}
             </Text>
           </View>
 
@@ -553,9 +555,19 @@ export default function ItineraryDetailScreen() {
             </Text>
             <ScrollView>
               {historyItems.length === 0 ? (
-                <Text variant="bodyMedium" style={styles.modalMessage}>
-                  No updates yet.
-                </Text>
+                <View style={styles.historyEmptyState}>
+                  <MaterialCommunityIcons
+                    name="history"
+                    size={30}
+                    color={theme.colors.onSurfaceVariant}
+                  />
+                  <Text variant="titleMedium" style={styles.historyEmptyTitle}>
+                    No updates yet
+                  </Text>
+                  <Text variant="bodyMedium" style={[styles.modalMessage, { color: theme.colors.onSurfaceVariant }]}> 
+                    AI update history will appear here after you add, replace, delete, or regenerate activities.
+                  </Text>
+                </View>
               ) : (
                 historyItems.map((item) => (
                   <View key={item.id} style={[styles.historyItem, { borderBottomColor: theme.colors.outlineVariant }]}> 
@@ -752,7 +764,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   modalContainer: {
-    margin: 20,
+    margin: 12,
   },
   modalContent: {
     borderRadius: 12,
@@ -764,6 +776,16 @@ const styles = StyleSheet.create({
   },
   modalMessage: {
     lineHeight: 22,
+    textAlign: 'center',
+  },
+  historyEmptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    gap: 8,
+  },
+  historyEmptyTitle: {
+    fontWeight: '700',
   },
   historyItem: {
     paddingVertical: 10,

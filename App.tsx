@@ -1,8 +1,8 @@
 import 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
-import { useColorScheme } from 'react-native';
-import { PaperProvider, Portal } from 'react-native-paper';
+import { Platform, View, useColorScheme } from 'react-native';
+import { PaperProvider, Portal, useTheme } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer, DefaultTheme as NavigationDefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -33,10 +33,26 @@ const GenerateStack = createNativeStackNavigator();
 const TripsStack = createNativeStackNavigator();
 const ProfileStack = createNativeStackNavigator();
 
+const smoothStackScreenOptions = {
+  headerShown: false,
+  animation: 'slide_from_right' as const,
+  gestureEnabled: true,
+  fullScreenGestureEnabled: true,
+  presentation: 'card' as const,
+  animationMatchesGesture: true,
+};
+
 // Stack navigators for each tab
 function HomeStackScreen() {
+  const theme = useTheme();
+
   return (
-    <HomeStack.Navigator screenOptions={{ headerShown: false }}>
+    <HomeStack.Navigator
+      screenOptions={{
+        ...smoothStackScreenOptions,
+        contentStyle: { backgroundColor: theme.colors.background },
+      }}
+    >
       <HomeStack.Screen
         name="Home"
         component={HomeScreen}
@@ -54,8 +70,15 @@ function HomeStackScreen() {
 }
 
 function GenerateStackScreen() {
+  const theme = useTheme();
+
   return (
-    <GenerateStack.Navigator screenOptions={{ headerShown: false }}>
+    <GenerateStack.Navigator
+      screenOptions={{
+        ...smoothStackScreenOptions,
+        contentStyle: { backgroundColor: theme.colors.background },
+      }}
+    >
       <GenerateStack.Screen
         name="Generate"
         component={GenerateScreen}
@@ -65,8 +88,15 @@ function GenerateStackScreen() {
 }
 
 function TripsStackScreen() {
+  const theme = useTheme();
+
   return (
-    <TripsStack.Navigator screenOptions={{ headerShown: false }}>
+    <TripsStack.Navigator
+      screenOptions={{
+        ...smoothStackScreenOptions,
+        contentStyle: { backgroundColor: theme.colors.background },
+      }}
+    >
       <TripsStack.Screen
         name="Trips"
         component={TripsScreen}
@@ -80,8 +110,15 @@ function TripsStackScreen() {
 }
 
 function ProfileStackScreen() {
+  const theme = useTheme();
+
   return (
-    <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
+    <ProfileStack.Navigator
+      screenOptions={{
+        ...smoothStackScreenOptions,
+        contentStyle: { backgroundColor: theme.colors.background },
+      }}
+    >
       <ProfileStack.Screen
         name="Profile"
         component={ProfileScreen}
@@ -105,23 +142,36 @@ function AppContent() {
   return (
       <PaperProvider theme={activeTheme}>
         <Portal.Host>
-          <NavigationContainer theme={appNavigationTheme}>
-            <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-            <Tab.Navigator
-              screenOptions={{
-                headerShown: false,
-                tabBarActiveTintColor: activeTheme.colors.primary,
-                tabBarInactiveTintColor: activeTheme.colors.onSurfaceVariant,
-                tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
-                tabBarStyle: {
-                  height: 70,
-                  paddingBottom: 12,
-                  paddingTop: 8,
-                  backgroundColor: activeTheme.colors.surface,
-                  borderTopColor: activeTheme.colors.outlineVariant,
-                },
-              }}
-            >
+          <View style={{ flex: 1, backgroundColor: activeTheme.colors.background }}>
+            <NavigationContainer theme={appNavigationTheme}>
+              <StatusBar
+                style={isDarkMode ? 'light' : 'dark'}
+                animated={false}
+                backgroundColor={activeTheme.colors.background}
+              />
+              <Tab.Navigator
+                detachInactiveScreens={false}
+                screenOptions={{
+                  headerShown: false,
+                  animation: Platform.OS === 'ios' ? 'shift' : 'fade',
+                  lazy: false,
+                  freezeOnBlur: true,
+                  sceneStyle: {
+                    backgroundColor: activeTheme.colors.background,
+                    overflow: 'hidden',
+                  },
+                  tabBarActiveTintColor: activeTheme.colors.primary,
+                  tabBarInactiveTintColor: activeTheme.colors.onSurfaceVariant,
+                  tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
+                  tabBarStyle: {
+                    height: 70,
+                    paddingBottom: 12,
+                    paddingTop: 8,
+                    backgroundColor: activeTheme.colors.surface,
+                    borderTopColor: activeTheme.colors.outlineVariant,
+                  },
+                }}
+              >
               <Tab.Screen
                 name="HomeTab"
                 component={HomeStackScreen}
@@ -162,8 +212,9 @@ function AppContent() {
                   ),
                 }}
               />
-            </Tab.Navigator>
-          </NavigationContainer>
+              </Tab.Navigator>
+            </NavigationContainer>
+          </View>
         </Portal.Host>
       </PaperProvider>
   );
