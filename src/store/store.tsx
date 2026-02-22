@@ -3,12 +3,14 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { IApplicationState, ApplicationAction } from '../types/application';
+import type { ThemeMode } from '../types/application';
 import type { IAuthResponse } from '../types/dtos/auth';
 import { apiClient } from '../services/api/apiClient';
 import { authApi } from '../services/api/auth';
 
 const TOKEN_STORAGE_KEY = '@ai_travel_itinerary/token';
 const REFRESH_TOKEN_STORAGE_KEY = '@ai_travel_itinerary/refresh_token';
+const THEME_MODE_STORAGE_KEY = '@ai_travel_itinerary/theme_mode';
 
 // Initial state
 const initialState: IApplicationState = {
@@ -16,6 +18,7 @@ const initialState: IApplicationState = {
   refreshToken: null,
   user: null,
   isGuest: true,
+  themeMode: 'system',
 };
 
 // Reducer
@@ -38,10 +41,16 @@ const appReducer = (state: IApplicationState, action: ApplicationAction): IAppli
         ...state,
         isGuest: action.payload,
       };
+    case 'SET_THEME_MODE':
+      return {
+        ...state,
+        themeMode: action.payload,
+      };
     case 'LOGOUT':
       return {
         ...initialState,
         isGuest: true,
+        themeMode: state.themeMode,
       };
     default:
       return state;
@@ -55,6 +64,7 @@ interface AppContextType {
   login: (authResponse: IAuthResponse) => Promise<void>;
   logout: () => Promise<void>;
   continueAsGuest: () => void;
+  setThemeMode: (mode: ThemeMode) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -66,6 +76,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Load tokens from storage on mount
   useEffect(() => {
     loadTokens();
+    loadThemeMode();
   }, []);
 
   // Save tokens to storage whenever they change
@@ -84,6 +95,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       apiClient.clearTokens();
     }
   }, [state.token, state.refreshToken]);
+
+  const loadThemeMode = async () => {
+    try {
+      const storedThemeMode = await AsyncStorage.getItem(THEME_MODE_STORAGE_KEY);
+
+      if (
+        storedThemeMode === 'light' ||
+        storedThemeMode === 'dark' ||
+        storedThemeMode === 'system'
+      ) {
+        dispatch({ type: 'SET_THEME_MODE', payload: storedThemeMode });
+      }
+    } catch (error) {
+      console.error('Error loading theme mode:', error);
+    }
+  };
 
   const loadTokens = async () => {
     try {
@@ -138,8 +165,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     dispatch({ type: 'SET_GUEST', payload: true });
   };
 
+  const setThemeMode = async (mode: ThemeMode) => {
+    dispatch({ type: 'SET_THEME_MODE', payload: mode });
+
+    try {
+      await AsyncStorage.setItem(THEME_MODE_STORAGE_KEY, mode);
+    } catch (error) {
+      console.error('Error saving theme mode:', error);
+    }
+  };
+
   return (
-    <AppContext.Provider value={{ state, dispatch, login, logout, continueAsGuest }}>
+    <AppContext.Provider value={{ state, dispatch, login, logout, continueAsGuest, setThemeMode }}>
       {children}
     </AppContext.Provider>
   );

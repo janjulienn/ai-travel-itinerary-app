@@ -209,7 +209,7 @@ export default function TripsScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {showPullToRefreshHint && (
         <View
           style={[
@@ -274,7 +274,6 @@ export default function TripsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
   },
   centerContainer: {
     flex: 1,

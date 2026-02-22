@@ -34,6 +34,11 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
   resetTrigger = 0,
 }) => {
   const theme = useTheme();
+  const selectedChipStyle = { backgroundColor: theme.colors.secondaryContainer };
+  const selectedChipTextStyle = {
+    color: theme.colors.onSecondaryContainer,
+    fontWeight: 'bold' as const,
+  };
   const [step, setStep] = useState(1);
 
   // Step 1 - Where & When
@@ -186,9 +191,9 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
                   onPress={() => setProvinceSlug(province.slug)}
                   style={[
                     styles.provinceChip,
-                    provinceSlug === province.slug && styles.selectedChip,
+                    provinceSlug === province.slug && selectedChipStyle,
                   ]}
-                  textStyle={provinceSlug === province.slug && styles.selectedChipText}
+                  textStyle={provinceSlug === province.slug ? selectedChipTextStyle : undefined}
                   showSelectedCheck
                   mode={provinceSlug === province.slug ? 'flat' : 'outlined'}
                 >
@@ -259,9 +264,9 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
                   icon={option.icon as any}
                   style={[
                     styles.optionChip,
-                    groupType === option.value && styles.selectedChip,
+                    groupType === option.value && selectedChipStyle,
                   ]}
-                  textStyle={groupType === option.value && styles.selectedChipText}
+                  textStyle={groupType === option.value ? selectedChipTextStyle : undefined}
                   showSelectedCheck
                   mode={groupType === option.value ? 'flat' : 'outlined'}
                 >
@@ -307,9 +312,9 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
                   icon={option.icon as any}
                   style={[
                     styles.optionChip,
-                    budget === option.value && styles.selectedChip,
+                    budget === option.value && selectedChipStyle,
                   ]}
-                  textStyle={budget === option.value && styles.selectedChipText}
+                  textStyle={budget === option.value ? selectedChipTextStyle : undefined}
                   showSelectedCheck
                   mode={budget === option.value ? 'flat' : 'outlined'}
                 >
@@ -331,9 +336,9 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
                   icon={option.icon as any}
                   style={[
                     styles.optionChip,
-                    pace === option.value && styles.selectedChip,
+                    pace === option.value && selectedChipStyle,
                   ]}
-                  textStyle={pace === option.value && styles.selectedChipText}
+                  textStyle={pace === option.value ? selectedChipTextStyle : undefined}
                   showSelectedCheck
                   mode={pace === option.value ? 'flat' : 'outlined'}
                 >
@@ -355,9 +360,9 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
                   icon={option.icon as any}
                   style={[
                     styles.interestChip,
-                    interests.includes(option.value) && styles.selectedChip,
+                    interests.includes(option.value) && selectedChipStyle,
                   ]}
-                  textStyle={interests.includes(option.value) && styles.selectedChipText}
+                  textStyle={interests.includes(option.value) ? selectedChipTextStyle : undefined}
                   showSelectedCheck
                   mode={interests.includes(option.value) ? 'flat' : 'outlined'}
                 >
@@ -388,7 +393,7 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
       </ScrollView>
 
       {/* Navigation Buttons */}
-      <View style={styles.actions}>
+      <View style={[styles.actions, { borderTopColor: theme.colors.outlineVariant }]}> 
         {step > 1 && (
           <Button mode="outlined" onPress={() => setStep(step - 1)} style={styles.backButton}>
             Back
@@ -418,7 +423,15 @@ export const GenerateWizard: React.FC<GenerateWizardProps> = ({
       </View>
 
       {loading && (
-        <View style={styles.loadingOverlay}>
+        <View
+          style={[
+            styles.loadingOverlay,
+            {
+              backgroundColor: theme.colors.surface,
+              borderTopColor: theme.colors.outlineVariant,
+            },
+          ]}
+        >
           <ProgressBar indeterminate color={theme.colors.primary} />
           <Text variant="bodyLarge" style={styles.loadingText}>
             Our AI travel expert is crafting your perfect itinerary...

@@ -11,7 +11,7 @@ import { VerticalTimelineItem } from '../VerticalTimeline';
 import { PlaceDetailModal } from '../PlaceDetailModal/index';
 import { PlaceSearchBottomSheet } from '../PlaceSearchBottomSheet';
 import { DeleteActivityModal } from '../DeleteActivityModal';
-import { ACTIVITY_CATEGORIES } from '../../constants';
+import { getActivityCategoryColor } from '../../theme';
 
 const MINUTES_PER_DAY = 24 * 60;
 
@@ -423,7 +423,7 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
                           endTime={activity.time_end}
                           durationMinutes={activity.duration_minutes}
                           markerColor={
-                            ACTIVITY_CATEGORIES[activity.category]?.color || theme.colors.primary
+                            getActivityCategoryColor(theme, activity.category)
                           }
                           isFirst={activityIndex === 0}
                           isLast={activityIndex === displayedActivities.length - 1}

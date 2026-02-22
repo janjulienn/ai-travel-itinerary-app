@@ -125,14 +125,14 @@ export const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({
     <Modal visible={visible} onRequestClose={onDismiss} animationType="fade" transparent>
       <View style={[styles.viewerContainer, { backgroundColor: theme.colors.scrim }]}> 
         <View style={styles.topBar}>
-          <Text variant="bodyLarge" style={styles.counterText}>
+          <Text variant="bodyLarge" style={[styles.counterText, { color: theme.colors.onSurface }]}>
             {currentIndex + 1} / {photos.length}
           </Text>
           <IconButton
             icon="close"
             size={28}
             onPress={onDismiss}
-            iconColor={theme.colors.onPrimary}
+            iconColor={theme.colors.onSurface}
             accessibilityLabel="Close photo viewer"
           />
         </View>
@@ -169,7 +169,7 @@ export const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({
             size={36}
             onPress={goLeft}
             disabled={!canGoLeft}
-            iconColor={theme.colors.onPrimary}
+            iconColor={theme.colors.onSurface}
             containerColor={theme.colors.backdrop}
             style={[styles.navigationButton, styles.leftButton]}
             accessibilityLabel="View previous photo"
@@ -180,14 +180,14 @@ export const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({
             size={36}
             onPress={goRight}
             disabled={!canGoRight}
-            iconColor={theme.colors.onPrimary}
+            iconColor={theme.colors.onSurface}
             containerColor={theme.colors.backdrop}
             style={[styles.navigationButton, styles.rightButton]}
             accessibilityLabel="View next photo"
           />
         </View>
 
-        <Text variant="bodySmall" style={styles.hintText}>
+        <Text variant="bodySmall" style={[styles.hintText, { color: theme.colors.onSurface }]}>
           Swipe up or down to close
         </Text>
       </View>
@@ -209,7 +209,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   counterText: {
-    color: '#fff',
     fontWeight: '600',
   },
   photoContainer: {
@@ -238,7 +237,6 @@ const styles = StyleSheet.create({
   },
   hintText: {
     textAlign: 'center',
-    color: '#fff',
     opacity: 0.9,
     marginTop: 8,
   },

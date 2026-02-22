@@ -5,7 +5,7 @@ import { View, StyleSheet, TouchableOpacity, GestureResponderEvent } from 'react
 import { Card, Text, Chip, useTheme, IconButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { IItineraryList } from '../../types/dtos/itinerary';
-import { STATUS_CONFIG } from '../../constants';
+import { getStatusConfig } from '../../theme';
 
 interface ItineraryCardProps {
   itinerary: IItineraryList;
@@ -21,7 +21,7 @@ export const ItineraryCard: React.FC<ItineraryCardProps> = ({
   deleting = false,
 }) => {
   const theme = useTheme();
-  const statusConfig = STATUS_CONFIG[itinerary.status];
+  const statusConfig = getStatusConfig(theme, itinerary.status);
   const displayTitle = itinerary.title?.trim()
     ? itinerary.title
     : itinerary.status === 'generating'
@@ -43,10 +43,12 @@ export const ItineraryCard: React.FC<ItineraryCardProps> = ({
                 {displayTitle}
               </Text>
               <View style={styles.actionsContainer}>
-                {itinerary.has_unseen_update && <View style={[styles.updateDot, { backgroundColor: '#03A9F4' }]} />}
+                {itinerary.has_unseen_update && (
+                  <View style={[styles.updateDot, { backgroundColor: theme.colors.primary }]} />
+                )}
                 <Chip
                   icon={statusConfig.icon}
-                  style={[styles.statusChip, { backgroundColor: statusConfig.color + '20' }]}
+                  style={[styles.statusChip, { backgroundColor: statusConfig.containerColor }]}
                   textStyle={{ color: statusConfig.color }}
                 >
                   {statusConfig.label}

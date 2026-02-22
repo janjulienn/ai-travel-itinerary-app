@@ -25,7 +25,7 @@ export default function ProvinceDetailScreen() {
 
   if (loading && !province) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text variant="bodyLarge" style={styles.loadingText}>
@@ -38,7 +38,7 @@ export default function ProvinceDetailScreen() {
 
   if (error || !province) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
         <View style={styles.centerContainer}>
           <ErrorCard
             message={error || 'Province not found'}
@@ -57,8 +57,8 @@ export default function ProvinceDetailScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-    <ScrollView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header with Image */}
       {(() => {
         const photos = province.photos || [];
@@ -132,7 +132,7 @@ export default function ProvinceDetailScreen() {
                     <View style={styles.placeActions}>
                       {place.rating != null && typeof place.rating === 'number' && (
                         <View style={styles.placeRating}>
-                          <MaterialCommunityIcons name="star" size={16} color="#FFC107" />
+                          <MaterialCommunityIcons name="star" size={16} color={theme.colors.secondary} />
                           <Text variant="bodyMedium">{place.rating.toFixed(1)}</Text>
                         </View>
                       )}
@@ -187,7 +187,6 @@ function getCategoryIcon(category: string): string {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
   },
   centerContainer: {
     flex: 1,

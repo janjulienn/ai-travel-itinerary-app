@@ -6,6 +6,7 @@ import { Surface, Text, Chip, Button, IconButton, useTheme } from 'react-native-
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { IItineraryActivity } from '../../types/dtos/itinerary';
 import { ACTIVITY_CATEGORIES } from '../../constants';
+import { getActivityCategoryColor } from '../../theme';
 import { PhotoViewerModal } from '../PhotoViewerModal';
 
 interface ActivityCardProps {
@@ -32,8 +33,8 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
   const categoryConfig = ACTIVITY_CATEGORIES[activity.category] || {
     icon: 'map-marker',
     label: activity.category_display || 'Activity',
-    color: theme.colors.primary,
   };
+  const categoryColor = getActivityCategoryColor(theme, activity.category);
 
   const descriptionLines = activity.description?.split('\n').length || 0;
   const shouldShowReadMore = descriptionLines > 3 || activity.description?.length > 150;
@@ -70,8 +71,8 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
             <View style={styles.headerTopRow}>
               <Chip
                 icon={categoryConfig.icon as any}
-                style={[styles.categoryChip, { backgroundColor: categoryConfig.color + '15' }]}
-                textStyle={{ color: categoryConfig.color, fontSize: 12 }}
+                style={[styles.categoryChip, { backgroundColor: theme.colors.surfaceVariant }]}
+                textStyle={{ color: categoryColor, fontSize: 12 }}
               >
                 {activity.category_display}
               </Chip>

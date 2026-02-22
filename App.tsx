@@ -1,6 +1,7 @@
 import 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
+import { useColorScheme } from 'react-native';
 import { PaperProvider, Portal } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer, DefaultTheme as NavigationDefaultTheme } from '@react-navigation/native';
@@ -10,8 +11,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { en, registerTranslation } from 'react-native-paper-dates';
 
 // Providers
-import { AppProvider } from './src/store/store';
-import { theme, navigationTheme } from './src/theme';
+import { AppProvider, useApp } from './src/store/store';
+import { darkTheme, lightTheme, navigationThemes } from './src/theme';
 
 // Screens
 import HomeScreen from './src/screens/HomeScreen';
@@ -84,26 +85,36 @@ function ProfileStackScreen() {
   );
 }
 
-export default function App() {
+function AppContent() {
+  const colorScheme = useColorScheme();
+  const { state } = useApp();
+  const isDarkMode = state.themeMode === 'system' ? colorScheme === 'dark' : state.themeMode === 'dark';
+  const activeTheme = isDarkMode ? darkTheme : lightTheme;
+  const activeNavigationTheme = isDarkMode ? navigationThemes.dark : navigationThemes.light;
+
   const appNavigationTheme = {
-    ...navigationTheme,
-    fonts: (navigationTheme as any).fonts ?? NavigationDefaultTheme.fonts,
+    ...activeNavigationTheme,
+    fonts: (activeNavigationTheme as any).fonts ?? NavigationDefaultTheme.fonts,
   };
 
   return (
-    <SafeAreaProvider>
-    <AppProvider>
-      <PaperProvider theme={theme}>
+      <PaperProvider theme={activeTheme}>
         <Portal.Host>
           <NavigationContainer theme={appNavigationTheme}>
-            <StatusBar style="auto" />
+            <StatusBar style={isDarkMode ? 'light' : 'dark'} />
             <Tab.Navigator
               screenOptions={{
                 headerShown: false,
-                tabBarActiveTintColor: theme.colors.primary,
-                tabBarInactiveTintColor: '#999',
+                tabBarActiveTintColor: activeTheme.colors.primary,
+                tabBarInactiveTintColor: activeTheme.colors.onSurfaceVariant,
                 tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
-                tabBarStyle: { height: 70, paddingBottom: 12, paddingTop: 8 },
+                tabBarStyle: {
+                  height: 70,
+                  paddingBottom: 12,
+                  paddingTop: 8,
+                  backgroundColor: activeTheme.colors.surface,
+                  borderTopColor: activeTheme.colors.outlineVariant,
+                },
               }}
             >
               <Tab.Screen
@@ -150,6 +161,14 @@ export default function App() {
           </NavigationContainer>
         </Portal.Host>
       </PaperProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+    <AppProvider>
+      <AppContent />
     </AppProvider>
     </SafeAreaProvider>
   );

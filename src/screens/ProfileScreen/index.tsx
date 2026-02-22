@@ -7,12 +7,28 @@ import { Text, Button, Divider, List, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthForm } from '../../components/AuthForm';
 import { SocialLoginButtons } from '../../components/SocialLoginButtons';
+import { ThemeSettingsSection } from '../../components/ThemeSettingsSection';
 import { useApp } from '../../store/store';
 
 export default function ProfileScreen() {
   const theme = useTheme();
-  const { state, logout, continueAsGuest } = useApp();
+  const { state, logout, continueAsGuest, setThemeMode } = useApp();
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const useSystemTheme = state.themeMode === 'system';
+  const darkModeEnabled = useSystemTheme ? theme.dark : state.themeMode === 'dark';
+
+  const handleSystemThemeToggle = async (enabled: boolean) => {
+    if (enabled) {
+      await setThemeMode('system');
+      return;
+    }
+
+    await setThemeMode(theme.dark ? 'dark' : 'light');
+  };
+
+  const handleThemeToggle = async (enabled: boolean) => {
+    await setThemeMode(enabled ? 'dark' : 'light');
+  };
 
   const toggleAuthMode = () => {
     setAuthMode(authMode === 'login' ? 'register' : 'login');
@@ -21,7 +37,7 @@ export default function ProfileScreen() {
   // Guest mode
   if (state.isGuest || !state.token) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
         <ScrollView style={styles.container}>
           <View style={styles.guestHeader}>
             <MaterialCommunityIcons name="account-circle" size={80} color={theme.colors.primary} />
@@ -36,6 +52,14 @@ export default function ProfileScreen() {
           <AuthForm mode={authMode} onToggleMode={toggleAuthMode} />
           
           <SocialLoginButtons />
+
+          <ThemeSettingsSection
+            useSystemTheme={useSystemTheme}
+            darkModeEnabled={darkModeEnabled}
+            onToggleSystemTheme={handleSystemThemeToggle}
+            onToggleDarkMode={handleThemeToggle}
+            showAdvancedItems={false}
+          />
 
           <Divider style={styles.divider} />
 
@@ -60,7 +84,7 @@ export default function ProfileScreen() {
   const user = state.user;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
       <ScrollView style={styles.container}>
       <View style={styles.profileHeader}>
         <MaterialCommunityIcons name="account-circle" size={100} color={theme.colors.primary} />
@@ -73,7 +97,16 @@ export default function ProfileScreen() {
           {user?.email}
         </Text>
         {user?.social_provider && user.social_provider !== 'email' && (
-          <Text variant="bodySmall" style={styles.socialBadge}>
+          <Text
+            variant="bodySmall"
+            style={[
+              styles.socialBadge,
+              {
+                backgroundColor: theme.colors.tertiaryContainer,
+                color: theme.colors.onTertiaryContainer,
+              },
+            ]}
+          >
             Signed in with {user.social_provider === 'google' ? 'Google' : 'Facebook'}
           </Text>
         )}
@@ -112,21 +145,13 @@ export default function ProfileScreen() {
         />
       </List.Section>
 
-      <List.Section>
-        <List.Subheader>App Settings</List.Subheader>
-        <List.Item
-          title="Notifications"
-          description="Manage notification preferences"
-          left={(props) => <List.Icon {...props} icon="bell" />}
-          right={(props) => <List.Icon {...props} icon="chevron-right" />}
-        />
-        <List.Item
-          title="Privacy"
-          description="Privacy and data settings"
-          left={(props) => <List.Icon {...props} icon="shield-account" />}
-          right={(props) => <List.Icon {...props} icon="chevron-right" />}
-        />
-      </List.Section>
+      <ThemeSettingsSection
+        useSystemTheme={useSystemTheme}
+        darkModeEnabled={darkModeEnabled}
+        onToggleSystemTheme={handleSystemThemeToggle}
+        onToggleDarkMode={handleThemeToggle}
+        showAdvancedItems
+      />
 
       <Button
         mode="outlined"
@@ -144,7 +169,6 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
   },
   container: {
     flex: 1,
@@ -192,9 +216,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingHorizontal: 12,
     paddingVertical: 4,
-    backgroundColor: '#E3F2FD',
     borderRadius: 12,
-    color: '#1976D2',
     fontWeight: '500',
   },
   logoutButton: {

@@ -25,7 +25,7 @@
 
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Button, Text, Snackbar } from 'react-native-paper';
+import { Button, Text, Snackbar, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface SocialLoginButtonsProps {
@@ -33,6 +33,7 @@ interface SocialLoginButtonsProps {
 }
 
 export const SocialLoginButtons: React.FC<SocialLoginButtonsProps> = ({ onSocialLogin }) => {
+  const theme = useTheme();
   const [snackbarVisible, setSnackbarVisible] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
 
@@ -59,11 +60,11 @@ export const SocialLoginButtons: React.FC<SocialLoginButtonsProps> = ({ onSocial
   return (
     <View style={styles.container}>
       <View style={styles.divider}>
-        <View style={styles.dividerLine} />
+        <View style={[styles.dividerLine, { backgroundColor: theme.colors.outlineVariant }]} />
         <Text variant="bodyMedium" style={styles.dividerText}>
           OR
         </Text>
-        <View style={styles.dividerLine} />
+        <View style={[styles.dividerLine, { backgroundColor: theme.colors.outlineVariant }]} />
       </View>
 
       <Button
@@ -112,7 +113,6 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E0E0E0',
   },
   dividerText: {
     marginHorizontal: 16,

@@ -61,7 +61,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
       {/* Hero Section */}
       <View style={styles.hero}>
         <Text variant="headlineLarge" style={styles.heroTitle}>
@@ -125,7 +125,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
   },
   centerContainer: {
     flex: 1,

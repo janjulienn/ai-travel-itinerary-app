@@ -13,7 +13,7 @@ import { AdjustmentSummaryModal } from '../../components/AdjustmentSummaryModal'
 import { useItineraryDetail } from '../../hooks/useItineraries';
 import { itinerariesApi } from '../../services/api/itineraries';
 import { addPendingItinerary } from '../../services/pendingItineraries';
-import { STATUS_CONFIG } from '../../constants';
+import { getStatusConfig } from '../../theme';
 import type { TripsStackParamList } from '../../types/navigation';
 import type {
   IActivityAddRequest,
@@ -284,7 +284,7 @@ export default function ItineraryDetailScreen() {
 
   if (loading && !itinerary) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text variant="bodyLarge" style={styles.loadingText}>
@@ -297,7 +297,7 @@ export default function ItineraryDetailScreen() {
 
   if (error || !itinerary) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
         <View style={styles.centerContainer}>
           <ErrorCard
             message={error || 'Itinerary not found'}
@@ -308,10 +308,10 @@ export default function ItineraryDetailScreen() {
     );
   }
 
-  const statusConfig = STATUS_CONFIG[itinerary.status];
+  const statusConfig = getStatusConfig(theme, itinerary.status);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
     {isStickyVisible && expandedDay && (
       <View
         style={[
@@ -360,7 +360,7 @@ export default function ItineraryDetailScreen() {
     )}
     <ScrollView
       ref={itineraryScrollRef}
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
       onScroll={(event) => setScrollY(event.nativeEvent.contentOffset.y)}
       scrollEventThrottle={16}
     >
@@ -373,7 +373,7 @@ export default function ItineraryDetailScreen() {
             </Text>
             <Chip
               icon={statusConfig.icon}
-              style={[styles.statusChip, { backgroundColor: statusConfig.color + '20' }]}
+              style={[styles.statusChip, { backgroundColor: statusConfig.containerColor }]}
               textStyle={{ color: statusConfig.color, fontWeight: 'bold' }}
             >
               {statusConfig.label}
@@ -594,7 +594,6 @@ export default function ItineraryDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
   },
   centerContainer: {
     flex: 1,

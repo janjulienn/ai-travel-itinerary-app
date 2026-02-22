@@ -19,7 +19,7 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
 
   return (
     <Portal>
-      <View style={[styles.overlay, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}>
+      <View style={[styles.overlay, { backgroundColor: theme.colors.scrim }]}> 
         <View style={[styles.content, { backgroundColor: theme.colors.surface }]}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text variant="bodyLarge" style={styles.message}>

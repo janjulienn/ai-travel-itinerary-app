@@ -83,7 +83,7 @@ export const AdjustmentSummaryModal: React.FC<AdjustmentSummaryModalProps> = ({
             style={styles.content}
             showsVerticalScrollIndicator={false}
           >
-            <Text variant="bodyMedium" style={styles.subtitle}>
+            <Text variant="bodyMedium" style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
               Here's what changed:
             </Text>
             
@@ -146,7 +146,6 @@ const styles = StyleSheet.create({
   subtitle: {
     fontWeight: '600',
     marginBottom: 12,
-    color: '#666',
   },
   summaryItem: {
     flexDirection: 'row',

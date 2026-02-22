@@ -144,6 +144,11 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
   nextActivity,
 }) => {
   const theme = useTheme();
+  const selectedChipStyle = { backgroundColor: theme.colors.secondaryContainer };
+  const selectedChipTextStyle = {
+    color: theme.colors.onSecondaryContainer,
+    fontWeight: 'bold' as const,
+  };
   const { height: windowHeight } = useWindowDimensions();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -494,9 +499,9 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                     onPress={() => setSelectedCategories([])}
                     style={[
                       styles.categoryChip,
-                      selectedCategories.length === 0 && styles.selectedChip,
+                      selectedCategories.length === 0 && selectedChipStyle,
                     ]}
-                    textStyle={selectedCategories.length === 0 ? styles.selectedChipText : undefined}
+                    textStyle={selectedCategories.length === 0 ? selectedChipTextStyle : undefined}
                     showSelectedCheck
                     mode={selectedCategories.length === 0 ? 'flat' : 'outlined'}
                   >
@@ -510,9 +515,9 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                       icon={cat.icon as any}
                       style={[
                         styles.categoryChip,
-                        selectedCategories.includes(cat.value) && styles.selectedChip,
+                        selectedCategories.includes(cat.value) && selectedChipStyle,
                       ]}
-                      textStyle={selectedCategories.includes(cat.value) ? styles.selectedChipText : undefined}
+                      textStyle={selectedCategories.includes(cat.value) ? selectedChipTextStyle : undefined}
                       showSelectedCheck
                       mode={selectedCategories.includes(cat.value) ? 'flat' : 'outlined'}
                     >
@@ -553,7 +558,10 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                             {item.category_display}
                           </Text>
                           {referencePoint && (
-                            <Text variant="labelSmall" style={styles.nearestBadgeText}>
+                            <Text
+                              variant="labelSmall"
+                              style={[styles.nearestBadgeText, { color: theme.colors.onSecondaryContainer }]}
+                            >
                               Nearest to timeline context
                             </Text>
                           )}
@@ -570,7 +578,7 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                       right={() =>
                         item.rating != null && typeof item.rating === 'number' ? (
                           <View style={styles.rating}>
-                            <MaterialCommunityIcons name="star" size={16} color="#FFC107" />
+                            <MaterialCommunityIcons name="star" size={16} color={theme.colors.secondary} />
                             <Text>{item.rating.toFixed(1)}</Text>
                           </View>
                         ) : null
@@ -603,7 +611,15 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
               scrollEnabled
               onContentSizeChange={(_, height) => setSelectedContentHeight(height)}
             >
-              <View style={styles.selectionSummaryCard}>
+              <View
+                style={[
+                  styles.selectionSummaryCard,
+                  {
+                    borderColor: theme.colors.outlineVariant,
+                    backgroundColor: theme.colors.surfaceVariant,
+                  },
+                ]}
+              >
                 {mode === 'replace' ? (
                   <>
                     <Text variant="labelLarge" style={styles.selectionSummaryTitle}>
@@ -645,7 +661,7 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                 )}
               </View>
 
-              <View style={styles.selectedPlace}>
+              <View style={[styles.selectedPlace, { backgroundColor: theme.colors.surfaceVariant }]}> 
                 <MaterialCommunityIcons
                   name={getCategoryIcon(selectedPlace.category) as any}
                   size={32}
@@ -674,7 +690,15 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
               </Button>
 
               {showMoreDetails && (
-                <View style={styles.inlineDetailsSection}>
+                <View
+                  style={[
+                    styles.inlineDetailsSection,
+                    {
+                      borderColor: theme.colors.outlineVariant,
+                      backgroundColor: theme.colors.surface,
+                    },
+                  ]}
+                >
                   <View style={styles.badgesRow}>
                     <Chip icon="tag" style={styles.detailChip} compact>
                       {selectedPlace.category_display}
@@ -755,7 +779,15 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                   </Button>
 
                   {showInsertPreview && (
-                    <View style={styles.insertPreviewContainer}>
+                    <View
+                      style={[
+                        styles.insertPreviewContainer,
+                        {
+                          borderColor: theme.colors.outlineVariant,
+                          backgroundColor: theme.colors.surface,
+                        },
+                      ]}
+                    >
                       {previousActivity && (
                         <View style={styles.insertPreviewRow}>
                           <Text variant="labelSmall" style={styles.insertPreviewTime}>
@@ -767,7 +799,13 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                         </View>
                       )}
 
-                      <View style={[styles.insertPreviewRow, styles.insertPreviewCurrentRow]}>
+                      <View
+                        style={[
+                          styles.insertPreviewRow,
+                          styles.insertPreviewCurrentRow,
+                          { backgroundColor: theme.colors.secondaryContainer },
+                        ]}
+                      >
                         <Text variant="labelSmall" style={[styles.insertPreviewTime, styles.insertPreviewCurrentTime]}>
                           {formatTo12Hour(timeStart.hours, timeStart.minutes)} - {formatTo12Hour(timeEnd.hours, timeEnd.minutes)}
                         </Text>
@@ -817,7 +855,7 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                 </View>
               </View>
 
-              <View style={styles.durationInfo}>
+              <View style={[styles.durationInfo, { backgroundColor: theme.colors.secondaryContainer }]}> 
                 <MaterialCommunityIcons name="clock-outline" size={20} color={theme.colors.primary} />
                 <Text variant="bodyLarge" style={styles.durationText}>
                   Duration: {duration} minutes ({Math.floor(duration / 60)}h {duration % 60}m)
