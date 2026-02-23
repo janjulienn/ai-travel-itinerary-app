@@ -16,7 +16,7 @@ export type HomeStackParamList = {
 };
 
 export type GenerateStackParamList = {
-  Generate: { countrySlug?: string; provinceSlug?: string };
+  Generate: { countrySlug?: string; provinceSlug?: string; resetToken?: number };
 };
 
 export type TripsStackParamList = {

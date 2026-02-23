@@ -27,6 +27,7 @@ export type GroupType = 'solo' | 'couple' | 'family' | 'group';
 
 export interface IItineraryActivity {
   id: number;
+  google_place_id: string;
   order: number;
   category: ActivityCategory;
   category_display: string;

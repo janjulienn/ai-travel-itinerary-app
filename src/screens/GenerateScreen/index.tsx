@@ -25,6 +25,7 @@ export default function GenerateScreen() {
   const { state } = useApp();
   const initialCountrySlug = route.params?.countrySlug;
   const initialProvinceSlug = route.params?.provinceSlug;
+  const resetToken = route.params?.resetToken;
   const { countries } = useCountries();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -33,6 +34,20 @@ export default function GenerateScreen() {
   const [prefillCountrySlug, setPrefillCountrySlug] = useState(initialCountrySlug);
   const [prefillProvinceSlug, setPrefillProvinceSlug] = useState(initialProvinceSlug);
   const skipNextAutoClearRef = useRef(false);
+
+  React.useEffect(() => {
+    if (resetToken === undefined) {
+      return;
+    }
+
+    setError('');
+    setLastRequestData(null);
+    setPrefillCountrySlug(undefined);
+    setPrefillProvinceSlug(undefined);
+    skipNextAutoClearRef.current = false;
+    setWizardResetKey((prev) => prev + 1);
+    navigation.setParams({ countrySlug: undefined, provinceSlug: undefined, resetToken: undefined } as never);
+  }, [navigation, resetToken]);
 
   React.useEffect(() => {
     if (!initialCountrySlug && !initialProvinceSlug) {

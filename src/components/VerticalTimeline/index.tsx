@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, type ViewStyle } from 'react-native';
+import { View, StyleSheet, type ViewStyle, type TextStyle, Pressable } from 'react-native';
 import { Text, Chip, useTheme } from 'react-native-paper';
 
 const DOT_SIZE = 18;
@@ -17,6 +17,9 @@ interface VerticalTimelineItemProps {
   isLast?: boolean;
   children: React.ReactNode;
   style?: ViewStyle;
+  onPressTimeColumn?: () => void;
+  timeColumnDisabled?: boolean;
+  underlineTimeText?: boolean;
 }
 
 export const VerticalTimelineItem: React.FC<VerticalTimelineItemProps> = ({
@@ -28,6 +31,9 @@ export const VerticalTimelineItem: React.FC<VerticalTimelineItemProps> = ({
   isLast = false,
   children,
   style,
+  onPressTimeColumn,
+  timeColumnDisabled = false,
+  underlineTimeText = false,
 }) => {
   const theme = useTheme();
   const railColor = theme.colors.outlineVariant;
@@ -36,17 +42,38 @@ export const VerticalTimelineItem: React.FC<VerticalTimelineItemProps> = ({
   return (
     <View style={[styles.row, style]}>
       <View style={styles.timeColumn}>
-        <Text variant="labelLarge" style={styles.startTime}>
-          {startTime}
-        </Text>
-        <Text variant="bodySmall" style={[styles.endTime, { color: theme.colors.onSurfaceVariant }]}>
-          {endTime}
-        </Text>
-        {typeof durationMinutes === 'number' && (
-          <Chip compact style={styles.durationChip} textStyle={styles.durationChipText}>
-            {durationMinutes} min
-          </Chip>
-        )}
+        <Pressable
+          onPress={onPressTimeColumn}
+          disabled={timeColumnDisabled || !onPressTimeColumn}
+          style={({ pressed }) => [
+            styles.timePressable,
+            pressed && styles.timePressablePressed,
+          ]}
+        >
+          <Text
+            variant="labelLarge"
+            style={[
+              styles.startTime,
+              underlineTimeText ? styles.underlinedTimeText : undefined,
+            ]}
+          >
+            {startTime}
+          </Text>
+          <Text
+            variant="bodySmall"
+            style={[
+              styles.endTime,
+              { color: theme.colors.onSurfaceVariant },
+            ]}
+          >
+            {endTime}
+          </Text>
+          {typeof durationMinutes === 'number' && (
+            <Chip compact style={styles.durationChip} textStyle={styles.durationChipText}>
+              {durationMinutes} min
+            </Chip>
+          )}
+        </Pressable>
       </View>
 
       <View style={styles.railColumn}>
@@ -73,6 +100,14 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingRight: 6,
   },
+  timePressable: {
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+  timePressablePressed: {
+    opacity: 0.75,
+  },
   startTime: {
     fontWeight: '700',
     textAlign: 'right',
@@ -82,6 +117,10 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: 2,
   },
+  underlinedTimeText: {
+    textDecorationLine: 'underline',
+    textDecorationStyle: 'solid',
+  } as TextStyle,
   durationChip: {
     marginTop: 6,
     alignSelf: 'flex-end',

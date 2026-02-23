@@ -286,6 +286,15 @@ export default function ItineraryDetailScreen() {
     setPendingAutoScrollDay(null);
   };
 
+  const handleBackPress = () => {
+    if ((navigation as any).canGoBack?.()) {
+      (navigation as any).goBack();
+      return;
+    }
+
+    (navigation as any).navigate('TripsTab', { screen: 'Trips' });
+  };
+
   if (loading && !itinerary) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
@@ -368,6 +377,15 @@ export default function ItineraryDetailScreen() {
       onScroll={(event) => setScrollY(event.nativeEvent.contentOffset.y)}
       scrollEventThrottle={16}
     >
+      <View style={styles.backButtonRow}>
+        <IconButton
+          icon="chevron-left"
+          size={24}
+          onPress={handleBackPress}
+          accessibilityLabel="Back to My Trips"
+        />
+      </View>
+
       {/* Header Card */}
       <Card style={styles.headerCard}>
         <Card.Content>
@@ -621,8 +639,14 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
   },
+  backButtonRow: {
+    alignItems: 'flex-start',
+    paddingHorizontal: 8,
+    paddingTop: 4,
+  },
   headerCard: {
-    margin: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
   },
   headerTop: {
     flexDirection: 'row',

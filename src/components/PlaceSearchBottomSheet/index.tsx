@@ -1,7 +1,18 @@
 // Place search bottom sheet component for adding/replacing activities
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { View, StyleSheet, ScrollView, useWindowDimensions, Alert, Linking, Pressable, Image } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  useWindowDimensions,
+  Alert,
+  Linking,
+  Pressable,
+  Image,
+  Animated,
+  Easing,
+} from 'react-native';
 import {
   Portal,
   Modal,
@@ -159,6 +170,7 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
   const [selectedPlace, setSelectedPlace] = useState<IPlace | null>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [buttonHeight, setButtonHeight] = useState(0);
+  const [browseContentHeight, setBrowseContentHeight] = useState(0);
   const [selectedContentHeight, setSelectedContentHeight] = useState(0);
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
@@ -174,6 +186,7 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
   const [timeEnd, setTimeEnd] = useState({ hours: 10, minutes: 0 });
   const [duration, setDuration] = useState(60);
   const requestSeqRef = useRef(0);
+  const animatedModalHeight = useRef(new Animated.Value(windowHeight * 0.78)).current;
 
   const referencePoint = useMemo<IReferencePoint | null>(() => {
     if (mode === 'replace') {
@@ -441,17 +454,45 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
     });
   };
 
+  const openTikTok = (placeName: string) => {
+    const searchQuery = provinceName ? `${placeName} ${provinceName}` : placeName;
+    const tiktokUrl = `snssdk1180://search?keyword=${encodeURIComponent(searchQuery)}`;
+
+    Linking.openURL(tiktokUrl).catch((error) => {
+      console.error('Failed to open TikTok:', error);
+      Alert.alert('TikTok unavailable', 'Please install TikTok to use this feature.');
+    });
+  };
+
   const openPhotoViewer = (index: number) => {
     setSelectedPhotoIndex(index);
     setPhotoViewerVisible(true);
   };
 
   const modalMaxHeight = windowHeight * 0.9;
-  const browseModalHeight = windowHeight * 0.78;
-  const selectedModalHeight = windowHeight * 0.84;
-  const currentModalHeight = selectedPlace
-    ? Math.min(selectedModalHeight, modalMaxHeight)
-    : Math.min(browseModalHeight, modalMaxHeight);
+  const browseFallbackHeight = windowHeight * 0.78;
+  const selectedFallbackHeight = windowHeight * 0.84;
+
+  const measuredBrowseHeight =
+    headerHeight > 0 && browseContentHeight > 0
+      ? Math.min(modalMaxHeight, headerHeight + browseContentHeight)
+      : Math.min(browseFallbackHeight, modalMaxHeight);
+
+  const measuredSelectedHeight =
+    headerHeight > 0 && buttonHeight > 0 && selectedContentHeight > 0
+      ? Math.min(modalMaxHeight, headerHeight + buttonHeight + selectedContentHeight)
+      : Math.min(selectedFallbackHeight, modalMaxHeight);
+
+  const targetModalHeight = selectedPlace ? measuredSelectedHeight : measuredBrowseHeight;
+
+  useEffect(() => {
+    Animated.timing(animatedModalHeight, {
+      toValue: targetModalHeight,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [animatedModalHeight, targetModalHeight]);
 
   return (
     <Portal>
@@ -460,11 +501,11 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
         onDismiss={onDismiss}
         contentContainerStyle={[styles.modal, { maxHeight: modalMaxHeight }]}
       >
-        <View
+        <Animated.View
           style={[
             styles.modalContent,
             { backgroundColor: theme.colors.surface },
-            { height: currentModalHeight },
+            { height: animatedModalHeight },
           ]}
         >
           <View style={styles.header} onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
@@ -486,6 +527,7 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
             <ScrollView 
               style={styles.content}
               showsVerticalScrollIndicator={false}
+              onContentSizeChange={(_, height) => setBrowseContentHeight(height)}
             >
               <View style={styles.searchSection}>
                 <Searchbar
@@ -642,43 +684,48 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                     <View style={styles.selectionArrowRow}>
                       <MaterialCommunityIcons name="swap-vertical" size={16} color={theme.colors.primary} />
                     </View>
-                    <Text variant="bodyMedium" style={styles.selectionToText} numberOfLines={2}>
-                      {selectedPlace.name}
-                    </Text>
+                    <View style={styles.selectionSummaryPlaceRow}>
+                      <MaterialCommunityIcons
+                        name={getCategoryIcon(selectedPlace.category) as any}
+                        size={22}
+                        color={theme.colors.primary}
+                      />
+                      <View style={styles.selectionSummaryPlaceTextWrap}>
+                        <Text variant="bodyMedium" style={styles.selectionToText} numberOfLines={2}>
+                          {selectedPlace.name}
+                        </Text>
+                        {!!selectedPlace.address && (
+                          <Text variant="bodySmall" style={styles.selectionSummaryAddress} numberOfLines={2}>
+                            {selectedPlace.address}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
                   </>
                 ) : (
                   <>
                     <Text variant="labelLarge" style={styles.selectionSummaryTitle}>
                       Adding activity
                     </Text>
-                    <Text variant="bodyMedium" style={styles.selectionToText} numberOfLines={2}>
-                      {selectedPlace.name}
-                    </Text>
-                    {!!selectedPlace.address && (
-                      <Text variant="bodySmall" style={styles.selectionSummaryAddress} numberOfLines={2}>
-                        {selectedPlace.address}
-                      </Text>
-                    )}
+                    <View style={styles.selectionSummaryPlaceRow}>
+                      <MaterialCommunityIcons
+                        name={getCategoryIcon(selectedPlace.category) as any}
+                        size={22}
+                        color={theme.colors.primary}
+                      />
+                      <View style={styles.selectionSummaryPlaceTextWrap}>
+                        <Text variant="bodyMedium" style={styles.selectionToText} numberOfLines={2}>
+                          {selectedPlace.name}
+                        </Text>
+                        {!!selectedPlace.address && (
+                          <Text variant="bodySmall" style={styles.selectionSummaryAddress} numberOfLines={2}>
+                            {selectedPlace.address}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
                   </>
                 )}
-              </View>
-
-              <View style={[styles.selectedPlace, { backgroundColor: theme.colors.surfaceVariant }]}> 
-                <MaterialCommunityIcons
-                  name={getCategoryIcon(selectedPlace.category) as any}
-                  size={32}
-                  color={theme.colors.primary}
-                />
-                <View style={styles.selectedPlaceInfo}>
-                  <View style={styles.selectedPlaceHeader}>
-                    <Text variant="titleMedium" style={styles.selectedPlaceName}>
-                      {selectedPlace.name}
-                    </Text>
-                  </View>
-                  <Text variant="bodyMedium" style={styles.selectedPlaceCategory}>
-                    {selectedPlace.category_display}
-                  </Text>
-                </View>
               </View>
 
               <Button
@@ -761,12 +808,55 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                       Open in Google Maps
                     </Button>
                   )}
+
+                  <Button
+                    mode="text"
+                    icon="music-note"
+                    onPress={() => openTikTok(selectedPlace.name)}
+                    compact
+                    style={styles.inlineMapsButton}
+                  >
+                    Open in TikTok
+                  </Button>
                 </View>
               )}
 
               <Text variant="titleMedium" style={styles.timeSectionTitle}>
                 Set Activity Time
               </Text>
+
+              <View style={styles.timeInputs}>
+                <View style={styles.timeInputContainer}>
+                  <Text variant="labelLarge">Start Time</Text>
+                  <Button
+                    mode="outlined"
+                    onPress={() => setStartTimePickerVisible(true)}
+                    style={styles.timePickerButton}
+                    icon="clock-outline"
+                  >
+                    {formatTo12Hour(timeStart.hours, timeStart.minutes)}
+                  </Button>
+                </View>
+
+                <View style={styles.timeInputContainer}>
+                  <Text variant="labelLarge">End Time</Text>
+                  <Button
+                    mode="outlined"
+                    onPress={() => setEndTimePickerVisible(true)}
+                    style={styles.timePickerButton}
+                    icon="clock-outline"
+                  >
+                    {formatTo12Hour(timeEnd.hours, timeEnd.minutes)}
+                  </Button>
+                </View>
+              </View>
+
+              <View style={[styles.durationInfo, { backgroundColor: theme.colors.secondaryContainer }]}> 
+                <MaterialCommunityIcons name="clock-outline" size={20} color={theme.colors.primary} />
+                <Text variant="bodyLarge" style={styles.durationText}>
+                  Duration: {duration} minutes ({Math.floor(duration / 60)}h {duration % 60}m)
+                </Text>
+              </View>
 
               {mode === 'add' && (previousActivity || nextActivity) && (
                 <View style={styles.insertPreviewToggleWrap}>
@@ -831,39 +921,6 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                 </View>
               )}
 
-              <View style={styles.timeInputs}>
-                <View style={styles.timeInputContainer}>
-                  <Text variant="labelLarge">Start Time</Text>
-                  <Button
-                    mode="outlined"
-                    onPress={() => setStartTimePickerVisible(true)}
-                    style={styles.timePickerButton}
-                    icon="clock-outline"
-                  >
-                    {formatTo12Hour(timeStart.hours, timeStart.minutes)}
-                  </Button>
-                </View>
-
-                <View style={styles.timeInputContainer}>
-                  <Text variant="labelLarge">End Time</Text>
-                  <Button
-                    mode="outlined"
-                    onPress={() => setEndTimePickerVisible(true)}
-                    style={styles.timePickerButton}
-                    icon="clock-outline"
-                  >
-                    {formatTo12Hour(timeEnd.hours, timeEnd.minutes)}
-                  </Button>
-                </View>
-              </View>
-
-              <View style={[styles.durationInfo, { backgroundColor: theme.colors.secondaryContainer }]}> 
-                <MaterialCommunityIcons name="clock-outline" size={20} color={theme.colors.primary} />
-                <Text variant="bodyLarge" style={styles.durationText}>
-                  Duration: {duration} minutes ({Math.floor(duration / 60)}h {duration % 60}m)
-                </Text>
-              </View>
-
               {mode === 'add' && (
                 <Text variant="bodySmall" style={styles.timeHintText}>
                   Suggested based on timeline slot
@@ -890,7 +947,7 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
             </View>
           </>
         )}
-        </View>
+        </Animated.View>
       </Modal>
 
       {/* Time Pickers */}
@@ -968,6 +1025,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 6,
   },
+  selectionSummaryPlaceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  selectionSummaryPlaceTextWrap: {
+    flex: 1,
+    justifyContent: 'center',
+  },
   selectionSummaryLabel: {
     opacity: 0.72,
     marginTop: 2,
@@ -989,6 +1055,7 @@ const styles = StyleSheet.create({
   },
   selectionSummaryAddress: {
     opacity: 0.72,
+    marginTop: 2,
   },
   moreDetailsToggle: {
     alignSelf: 'flex-start',
@@ -1070,31 +1137,6 @@ const styles = StyleSheet.create({
   emptyContainer: {
     padding: 32,
     alignItems: 'center',
-  },
-  selectedPlace: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    marginBottom: 24,
-  },
-  selectedPlaceInfo: {
-    marginLeft: 16,
-    flex: 1,
-  },
-  selectedPlaceHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  selectedPlaceName: {
-    fontWeight: 'bold',
-    flex: 1,
-  },
-  selectedPlaceCategory: {
-    opacity: 0.7,
-    marginTop: 4,
   },
   inlineDetailsSection: {
     borderWidth: 1,

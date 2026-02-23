@@ -10,7 +10,7 @@ import {
   NativeScrollEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, Button, ActivityIndicator, Snackbar, useTheme } from 'react-native-paper';
+import { Text, Button, ActivityIndicator, Snackbar, useTheme, IconButton } from 'react-native-paper';
 import { useNavigation, useFocusEffect, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AxiosError } from 'axios';
@@ -106,6 +106,13 @@ export default function TripsScreen() {
 
   const handleItineraryPress = (id: string) => {
     navigation.navigate('ItineraryDetail', { id });
+  };
+
+  const handleAddItineraryPress = () => {
+    (navigation as any).navigate('GenerateTab', {
+      screen: 'Generate',
+      params: { resetToken: Date.now(), countrySlug: undefined, provinceSlug: undefined },
+    });
   };
 
   const getDeleteErrorMessage = (error: unknown): string => {
@@ -225,6 +232,14 @@ export default function TripsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={[styles.topRightActions, { top: insets.top + 4 }]}> 
+        <IconButton
+          icon="plus"
+          mode="contained"
+          onPress={handleAddItineraryPress}
+          accessibilityLabel="Add itinerary"
+        />
+      </View>
       {showPullToRefreshHint && (
         <View
           style={[
@@ -252,7 +267,7 @@ export default function TripsScreen() {
             generatingDotsPhase={generatingDotsPhase}
           />
         )}
-        contentContainerStyle={[styles.list, { paddingTop: insets.top + 8 }]}
+        contentContainerStyle={[styles.list, { paddingTop: insets.top + 56 }]}
         ListHeaderComponent={
           isPullRefreshing && itineraries.length > 0 ? (
             <View style={styles.listLoadingContainer}>
@@ -290,6 +305,11 @@ export default function TripsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  topRightActions: {
+    position: 'absolute',
+    right: 8,
+    zIndex: 2,
   },
   centerContainer: {
     flex: 1,

@@ -1,9 +1,19 @@
 // Itinerary timeline component with day accordion and per-day edit mode
 
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, LayoutChangeEvent } from 'react-native';
-import { List, Text, Divider, useTheme, Button } from 'react-native-paper';
+import {
+  View,
+  StyleSheet,
+  LayoutChangeEvent,
+  ScrollView,
+  Linking,
+  Pressable,
+  Image,
+  useWindowDimensions,
+} from 'react-native';
+import { List, Text, Divider, useTheme, Button, Portal, Modal } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { TimePickerModal } from 'react-native-paper-dates';
 import type { IItineraryDay, IItineraryActivity } from '../../types/dtos/itinerary';
 import type { IPlace } from '../../types/dtos/province';
 import { ActivityCard } from '../ActivityCard';
@@ -14,6 +24,7 @@ import { DeleteActivityModal } from '../DeleteActivityModal';
 import { getActivityCategoryColor } from '../../theme';
 
 const MINUTES_PER_DAY = 24 * 60;
+const TIME_UPDATE_MODAL_VERTICAL_CHROME = 56;
 
 const parse12HourTimeToMinutes = (timeStr: string): number => {
   const [timePart, period] = timeStr.split(' ');
@@ -38,6 +49,47 @@ const formatMinutesTo24HourTime = (totalMinutes: number): string => {
 const clampOneHourRange = (startMinutes: number): { start: number; end: number } => {
   const clampedStart = Math.max(0, Math.min(startMinutes, MINUTES_PER_DAY - 60));
   return { start: clampedStart, end: clampedStart + 60 };
+};
+
+const parseTimeLabelToHoursMinutes = (timeStr: string): { hours: number; minutes: number } => {
+  const totalMinutes = parse12HourTimeToMinutes(timeStr);
+  return {
+    hours: Math.floor(totalMinutes / 60),
+    minutes: totalMinutes % 60,
+  };
+};
+
+const formatTo12Hour = (hours: number, minutes: number): string => {
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const normalizedHours = hours % 12 || 12;
+  return `${normalizedHours}:${String(minutes).padStart(2, '0')} ${period}`;
+};
+
+const formatTo24Hour = (hours: number, minutes: number): string => {
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
+const getCategoryIcon = (category: string): string => {
+  switch (category) {
+    case 'beach':
+      return 'beach';
+    case 'restaurant':
+      return 'silverware-fork-knife';
+    case 'attraction':
+      return 'camera';
+    case 'activity':
+      return 'run';
+    case 'nature':
+      return 'tree';
+    case 'landmark':
+      return 'bank';
+    case 'accommodation':
+      return 'home-city';
+    case 'food_trip':
+      return 'food';
+    default:
+      return 'map-marker';
+  }
 };
 
 const isTransitActivity = (activity: IItineraryActivity): boolean => {
@@ -99,6 +151,7 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
   editToggleDayNumber,
 }) => {
   const theme = useTheme();
+  const { height: windowHeight } = useWindowDimensions();
   const [editingDayId, setEditingDayId] = useState<number | null>(null);
   const [expandedDay, setExpandedDay] = useState<number>(1); // First day expanded by default
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
@@ -120,8 +173,35 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
   // Delete modal state
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [activityToDelete, setActivityToDelete] = useState<IItineraryActivity | null>(null);
+  const [timeUpdateVisible, setTimeUpdateVisible] = useState(false);
+  const [activityBeingTimeUpdated, setActivityBeingTimeUpdated] = useState<IItineraryActivity | null>(null);
+  const [timeUpdateError, setTimeUpdateError] = useState<string | null>(null);
+  const [timeUpdateStart, setTimeUpdateStart] = useState({ hours: 8, minutes: 0 });
+  const [timeUpdateEnd, setTimeUpdateEnd] = useState({ hours: 9, minutes: 0 });
+  const [timeUpdateStartPickerVisible, setTimeUpdateStartPickerVisible] = useState(false);
+  const [timeUpdateEndPickerVisible, setTimeUpdateEndPickerVisible] = useState(false);
+  const [timeUpdateShowDetails, setTimeUpdateShowDetails] = useState(false);
+  const [timeUpdateHeaderHeight, setTimeUpdateHeaderHeight] = useState(0);
+  const [timeUpdateActionHeight, setTimeUpdateActionHeight] = useState(0);
+  const [timeUpdateContentHeight, setTimeUpdateContentHeight] = useState(0);
   const lastCollapseSignalRef = useRef<number | undefined>(collapseSignal);
   const lastEditToggleSignalRef = useRef<number | undefined>(editToggleSignal);
+  const timeUpdateModalMaxHeight = windowHeight * 0.9;
+  const timeUpdateFallbackHeight = Math.min(windowHeight * 0.8, timeUpdateModalMaxHeight);
+  const timeUpdateTotalContentHeight =
+    timeUpdateHeaderHeight +
+    timeUpdateActionHeight +
+    timeUpdateContentHeight +
+    TIME_UPDATE_MODAL_VERTICAL_CHROME;
+  const timeUpdateMeasuredHeight =
+    timeUpdateHeaderHeight > 0 && timeUpdateActionHeight > 0 && timeUpdateContentHeight > 0
+      ? Math.min(timeUpdateModalMaxHeight, timeUpdateTotalContentHeight)
+      : timeUpdateFallbackHeight;
+  const timeUpdateNeedsScroll =
+    timeUpdateHeaderHeight > 0 &&
+    timeUpdateActionHeight > 0 &&
+    timeUpdateContentHeight > 0 &&
+    timeUpdateTotalContentHeight > timeUpdateModalMaxHeight;
 
   const exitEditMode = () => {
     setEditingDayId(null);
@@ -293,6 +373,111 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
     setDeleteModalVisible(true);
   };
 
+  const handleOpenTimeUpdate = (activity: IItineraryActivity) => {
+    const start = parseTimeLabelToHoursMinutes(activity.time_start);
+    const end = parseTimeLabelToHoursMinutes(activity.time_end);
+
+    setActivityBeingTimeUpdated(activity);
+    setTimeUpdateStart(start);
+    setTimeUpdateEnd(end);
+    setTimeUpdateError(null);
+    setTimeUpdateShowDetails(false);
+    setTimeUpdateVisible(true);
+  };
+
+  const handleDismissTimeUpdate = () => {
+    setTimeUpdateVisible(false);
+  };
+
+  const openTimeUpdateGoogleMaps = () => {
+    const url = activityBeingTimeUpdated?.place_detail?.google_maps_url;
+    if (!url) {
+      return;
+    }
+
+    Linking.openURL(url).catch(() => {
+      setTimeUpdateError('Failed to open Google Maps for this place.');
+    });
+  };
+
+  const openTimeUpdateTikTok = () => {
+    const placeName =
+      activityBeingTimeUpdated?.place_detail?.name ||
+      activityBeingTimeUpdated?.location_name ||
+      activityBeingTimeUpdated?.title;
+
+    if (!placeName) {
+      return;
+    }
+
+    const searchQuery = provinceName ? `${placeName} ${provinceName}` : placeName;
+    const tiktokUrl = `snssdk1180://search?keyword=${encodeURIComponent(searchQuery)}`;
+    Linking.openURL(tiktokUrl).catch(() => {
+      setTimeUpdateError('Please install TikTok to use this feature.');
+    });
+  };
+
+  const handleTimeUpdateStartConfirm = ({ hours, minutes }: { hours: number; minutes: number }) => {
+    setTimeUpdateStartPickerVisible(false);
+    setTimeUpdateStart({ hours, minutes });
+
+    const startMinutes = hours * 60 + minutes;
+    const currentEndMinutes = timeUpdateEnd.hours * 60 + timeUpdateEnd.minutes;
+    if (currentEndMinutes <= startMinutes) {
+      const nextRange = clampOneHourRange(startMinutes);
+      setTimeUpdateEnd({
+        hours: Math.floor(nextRange.end / 60),
+        minutes: nextRange.end % 60,
+      });
+    }
+  };
+
+  const handleTimeUpdateEndConfirm = ({ hours, minutes }: { hours: number; minutes: number }) => {
+    setTimeUpdateEndPickerVisible(false);
+
+    const endMinutes = hours * 60 + minutes;
+    const currentStartMinutes = timeUpdateStart.hours * 60 + timeUpdateStart.minutes;
+    if (endMinutes <= currentStartMinutes) {
+      setTimeUpdateError('End time must be after start time.');
+      return;
+    }
+
+    setTimeUpdateError(null);
+    setTimeUpdateEnd({ hours, minutes });
+  };
+
+  const handleSaveTimeUpdate = async () => {
+    if (!activityBeingTimeUpdated || !onActivityReplaced) {
+      return;
+    }
+
+    const placeId = activityBeingTimeUpdated.place_detail?.google_place_id || activityBeingTimeUpdated.google_place_id;
+    if (!placeId) {
+      setTimeUpdateError('Cannot update time for this activity because no place ID is available.');
+      return;
+    }
+
+    const startMinutes = timeUpdateStart.hours * 60 + timeUpdateStart.minutes;
+    const endMinutes = timeUpdateEnd.hours * 60 + timeUpdateEnd.minutes;
+    if (endMinutes <= startMinutes) {
+      setTimeUpdateError('End time must be after start time.');
+      return;
+    }
+
+    try {
+      setTimeUpdateError(null);
+      await onActivityReplaced(activityBeingTimeUpdated.id, {
+        new_google_place_id: placeId,
+        time_start: formatTo24Hour(timeUpdateStart.hours, timeUpdateStart.minutes),
+        time_end: formatTo24Hour(timeUpdateEnd.hours, timeUpdateEnd.minutes),
+        duration_minutes: endMinutes - startMinutes,
+      });
+      handleDismissTimeUpdate();
+    } catch (error) {
+      setTimeUpdateError('Failed to update activity time schedule. Please try again.');
+    }
+  };
+
   const handleSavePlace = async (data: {
     place: IPlace;
     time_start: string;
@@ -431,6 +616,9 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
 
                     {displayedActivities.map((activity, activityIndex) => (
                       <View key={activity.id}>
+                        {(() => {
+                          const transit = isTransitActivity(activity);
+                          return (
                         <VerticalTimelineItem
                           startTime={activity.time_start}
                           endTime={activity.time_end}
@@ -440,8 +628,15 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
                           }
                           isFirst={activityIndex === 0}
                           isLast={activityIndex === displayedActivities.length - 1}
+                          onPressTimeColumn={
+                            isEditingThisDay && !transit
+                              ? () => handleOpenTimeUpdate(activity)
+                              : undefined
+                          }
+                          timeColumnDisabled={!isEditingThisDay || transit || isLoading}
+                          underlineTimeText={isEditingThisDay && !transit}
                         >
-                          {isTransitActivity(activity) ? (
+                          {transit ? (
                             <View style={[styles.transitRow, { borderColor: theme.colors.outlineVariant }]}> 
                               <View style={styles.transitContentRow}>
                                 <MaterialCommunityIcons
@@ -470,6 +665,8 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
                             />
                           )}
                         </VerticalTimelineItem>
+                          );
+                        })()}
                         
                         {/* Insert button after each activity */}
                         {isEditingThisDay && (
@@ -529,6 +726,253 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
         }}
         onConfirm={handleConfirmDelete}
         activityName={activityToDelete?.title}
+      />
+
+      <Portal>
+        <Modal
+          visible={timeUpdateVisible}
+          onDismiss={handleDismissTimeUpdate}
+          contentContainerStyle={styles.timeUpdateModalContainer}
+        >
+          <View
+            style={[
+              styles.timeUpdateModalContent,
+              { backgroundColor: theme.colors.surface, height: timeUpdateMeasuredHeight },
+            ]}
+          >
+            <View onLayout={(event) => setTimeUpdateHeaderHeight(event.nativeEvent.layout.height)}>
+              <Text variant="titleLarge" style={styles.timeUpdateTitle}>
+                Update Activity Time
+              </Text>
+            </View>
+
+            <ScrollView
+              style={styles.timeUpdateScroll}
+              contentContainerStyle={styles.timeUpdateScrollContent}
+              scrollEnabled={timeUpdateNeedsScroll}
+              onContentSizeChange={(_, height) => setTimeUpdateContentHeight(height)}
+            >
+              <View
+                style={[
+                  styles.timeUpdateDescriptionBox,
+                  {
+                    borderColor: theme.colors.outlineVariant,
+                    backgroundColor: theme.colors.surfaceVariant,
+                  },
+                ]}
+              >
+                <Text variant="labelLarge" style={styles.timeUpdateSummaryTitle}>
+                  Updating Activity Time Schedule for
+                </Text>
+                <View style={styles.timeUpdateSummaryPlaceRow}>
+                  <MaterialCommunityIcons
+                    name={getCategoryIcon(activityBeingTimeUpdated?.place_detail?.category || '') as any}
+                    size={22}
+                    color={theme.colors.primary}
+                  />
+                  <View style={styles.timeUpdateSummaryPlaceTextWrap}>
+                    <Text variant="bodyMedium" style={styles.timeUpdateSummaryPlace} numberOfLines={2}>
+                      {activityBeingTimeUpdated?.location_name || activityBeingTimeUpdated?.place_detail?.name || activityBeingTimeUpdated?.title}
+                    </Text>
+                    {!!(activityBeingTimeUpdated?.location_address || activityBeingTimeUpdated?.place_detail?.address) && (
+                      <Text variant="bodySmall" style={styles.timeUpdateSummaryAddress} numberOfLines={2}>
+                        {activityBeingTimeUpdated?.location_address || activityBeingTimeUpdated?.place_detail?.address}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </View>
+
+              <Button
+                mode="text"
+                onPress={() => setTimeUpdateShowDetails((previous) => !previous)}
+                icon={timeUpdateShowDetails ? 'chevron-up' : 'chevron-down'}
+                compact
+                style={styles.timeUpdateDetailsToggle}
+              >
+                {timeUpdateShowDetails ? 'Hide details' : 'Show details'}
+              </Button>
+
+              {timeUpdateShowDetails && activityBeingTimeUpdated?.place_detail && (
+                <View
+                  style={[
+                    styles.timeUpdateDetailsSection,
+                    { borderColor: theme.colors.outlineVariant, backgroundColor: theme.colors.surface },
+                  ]}
+                >
+                  <View style={styles.timeUpdateBadgesRow}>
+                    <View
+                      style={[
+                        styles.timeUpdateChipWrap,
+                        {
+                          borderColor: theme.colors.outlineVariant,
+                          backgroundColor: theme.colors.surfaceVariant,
+                        },
+                      ]}
+                    >
+                      <Text variant="bodySmall">{activityBeingTimeUpdated.place_detail.category_display}</Text>
+                    </View>
+                    {activityBeingTimeUpdated.place_detail.rating != null && (
+                      <View
+                        style={[
+                          styles.timeUpdateChipWrap,
+                          {
+                            borderColor: theme.colors.outlineVariant,
+                            backgroundColor: theme.colors.surfaceVariant,
+                          },
+                        ]}
+                      >
+                        <Text variant="bodySmall">
+                          ⭐ {activityBeingTimeUpdated.place_detail.rating.toFixed(1)} ({activityBeingTimeUpdated.place_detail.total_ratings || 0})
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {!!activityBeingTimeUpdated.place_detail.description && (
+                    <Text variant="bodySmall" style={styles.timeUpdateDetailsDescription}>
+                      {activityBeingTimeUpdated.place_detail.description}
+                    </Text>
+                  )}
+
+                  {!!activityBeingTimeUpdated.place_detail.photos?.length && (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.timeUpdatePhotosContainer}
+                      contentContainerStyle={styles.timeUpdatePhotosContent}
+                    >
+                      {activityBeingTimeUpdated.place_detail.photos.map((photo, index) => (
+                        <Pressable key={`${activityBeingTimeUpdated.id}-detail-photo-${index}`}>
+                          <Image source={{ uri: photo }} style={styles.timeUpdatePhoto} resizeMode="cover" />
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  )}
+
+                  {!!activityBeingTimeUpdated.place_detail.address && (
+                    <Text variant="bodySmall" style={styles.timeUpdateDetailsAddress}>
+                      {activityBeingTimeUpdated.place_detail.address}
+                    </Text>
+                  )}
+
+                  <View style={styles.timeUpdateDetailActions}>
+                    {!!activityBeingTimeUpdated.place_detail.google_maps_url && (
+                      <Button mode="text" icon="map-marker-outline" onPress={openTimeUpdateGoogleMaps} compact>
+                        Open in Google Maps
+                      </Button>
+                    )}
+
+                    <Button mode="text" icon="music-note" onPress={openTimeUpdateTikTok} compact>
+                      Open in TikTok
+                    </Button>
+                  </View>
+                </View>
+              )}
+
+              <Text variant="titleMedium" style={styles.timeUpdateSectionTitle}>
+                Update Activity Time
+              </Text>
+
+              <View style={styles.timeUpdateInputRow}>
+                <View style={styles.timeUpdateInputCol}>
+                  <Text variant="labelLarge">Start Time</Text>
+                  <Button
+                    mode="outlined"
+                    icon="clock-outline"
+                    onPress={() => setTimeUpdateStartPickerVisible(true)}
+                  >
+                    {formatTo12Hour(timeUpdateStart.hours, timeUpdateStart.minutes)}
+                  </Button>
+                </View>
+
+                <View style={styles.timeUpdateInputCol}>
+                  <Text variant="labelLarge">End Time</Text>
+                  <Button
+                    mode="outlined"
+                    icon="clock-outline"
+                    onPress={() => setTimeUpdateEndPickerVisible(true)}
+                  >
+                    {formatTo12Hour(timeUpdateEnd.hours, timeUpdateEnd.minutes)}
+                  </Button>
+                </View>
+              </View>
+
+              <Text variant="labelLarge" style={styles.timeUpdateSectionLabel}>
+                Time Update Preview
+              </Text>
+              <View
+                style={[
+                  styles.timeUpdatePreview,
+                  {
+                    borderColor: theme.colors.outlineVariant,
+                    backgroundColor: theme.colors.surfaceVariant,
+                  },
+                ]}
+              >
+                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                  Current: {activityBeingTimeUpdated?.time_start} - {activityBeingTimeUpdated?.time_end}
+                </Text>
+                <Text variant="bodyMedium" style={styles.timeUpdatePreviewNew}>
+                  New: {formatTo12Hour(timeUpdateStart.hours, timeUpdateStart.minutes)} - {formatTo12Hour(timeUpdateEnd.hours, timeUpdateEnd.minutes)}
+                </Text>
+              </View>
+
+              <Text variant="bodySmall" style={styles.timeUpdateHintText}>
+                AI will intelligently adjust the whole day's itinerary based on this time update.
+              </Text>
+
+              {timeUpdateError && (
+                <Text variant="bodySmall" style={{ color: theme.colors.error }}>
+                  {timeUpdateError}
+                </Text>
+              )}
+            </ScrollView>
+
+            <View
+              style={styles.timeUpdateActions}
+              onLayout={(event) => setTimeUpdateActionHeight(event.nativeEvent.layout.height)}
+            >
+              <Button mode="outlined" onPress={handleDismissTimeUpdate} style={styles.timeUpdateActionButton}>
+                Cancel
+              </Button>
+              <Button
+                mode="contained"
+                icon="check"
+                onPress={handleSaveTimeUpdate}
+                loading={isLoading}
+                disabled={isLoading}
+                style={styles.timeUpdateActionButton}
+              >
+                Save
+              </Button>
+            </View>
+          </View>
+        </Modal>
+      </Portal>
+
+      <TimePickerModal
+        visible={timeUpdateStartPickerVisible}
+        onDismiss={() => setTimeUpdateStartPickerVisible(false)}
+        onConfirm={handleTimeUpdateStartConfirm}
+        hours={timeUpdateStart.hours}
+        minutes={timeUpdateStart.minutes}
+        label="Select start time"
+        cancelLabel="Cancel"
+        confirmLabel="OK"
+        animationType="fade"
+      />
+
+      <TimePickerModal
+        visible={timeUpdateEndPickerVisible}
+        onDismiss={() => setTimeUpdateEndPickerVisible(false)}
+        onConfirm={handleTimeUpdateEndConfirm}
+        hours={timeUpdateEnd.hours}
+        minutes={timeUpdateEnd.minutes}
+        label="Select end time"
+        cancelLabel="Cancel"
+        confirmLabel="OK"
+        animationType="fade"
       />
     </>
   );
@@ -606,5 +1050,123 @@ const styles = StyleSheet.create({
   },
   transitIcon: {
     marginRight: 8,
+  },
+  timeUpdateModalContainer: {
+    margin: 16,
+  },
+  timeUpdateModalContent: {
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+  },
+  timeUpdateScroll: {},
+  timeUpdateScrollContent: {
+    paddingBottom: 8,
+    gap: 10,
+  },
+  timeUpdateTitle: {
+    fontWeight: '700',
+  },
+  timeUpdateDescriptionBox: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+  },
+  timeUpdateSummaryTitle: {
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  timeUpdateSummaryPlaceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  timeUpdateSummaryPlaceTextWrap: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  timeUpdateSummaryPlace: {
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  timeUpdateSummaryAddress: {
+    marginTop: 2,
+    opacity: 0.72,
+  },
+  timeUpdateDetailsToggle: {
+    alignSelf: 'flex-start',
+  },
+  timeUpdateDetailsSection: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    gap: 8,
+  },
+  timeUpdateBadgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  timeUpdateChipWrap: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  timeUpdateDetailsDescription: {
+    lineHeight: 19,
+  },
+  timeUpdatePhotosContainer: {
+    marginVertical: 2,
+  },
+  timeUpdatePhotosContent: {
+    gap: 8,
+  },
+  timeUpdatePhoto: {
+    width: 110,
+    height: 78,
+    borderRadius: 8,
+  },
+  timeUpdateDetailsAddress: {
+    opacity: 0.8,
+  },
+  timeUpdateDetailActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 2,
+  },
+  timeUpdateSectionTitle: {
+    fontWeight: '700',
+  },
+  timeUpdateSectionLabel: {
+    marginTop: 2,
+  },
+  timeUpdatePreview: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    gap: 4,
+  },
+  timeUpdatePreviewNew: {
+    fontWeight: '700',
+  },
+  timeUpdateInputRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  timeUpdateInputCol: {
+    flex: 1,
+    gap: 6,
+  },
+  timeUpdateHintText: {
+    opacity: 0.75,
+  },
+  timeUpdateActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  timeUpdateActionButton: {
+    flex: 1,
   },
 });

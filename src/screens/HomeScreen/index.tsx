@@ -112,12 +112,6 @@ export default function HomeScreen() {
             <Text variant="titleMedium" style={styles.countryName}>
               {item.name}
             </Text>
-            <Text
-              variant="bodyMedium"
-              style={[styles.countryCode, { color: theme.colors.onSurfaceVariant }]}
-            >
-              {item.code}
-            </Text>
             {!!item.description && (
               <Text
                 variant="bodySmall"
@@ -199,9 +193,6 @@ const styles = StyleSheet.create({
   },
   countryName: {
     fontWeight: '700',
-  },
-  countryCode: {
-    marginTop: 4,
   },
   countryDescription: {
     marginTop: 8,
