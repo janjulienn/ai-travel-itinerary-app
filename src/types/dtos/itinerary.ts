@@ -141,7 +141,71 @@ export interface IItineraryAdjustmentResponse extends IItineraryDetail {
   adjustment_summary?: string;
 }
 
-export type ItineraryAdjustmentOperation = 'add' | 'replace' | 'delete';
+export interface IItineraryOverviewActivity {
+  id: number;
+  order: number;
+  time_start: string; // 12-hour format
+  time_end: string; // 12-hour format
+  duration_minutes: number;
+  title: string;
+  location_name: string;
+  category: ActivityCategory;
+  google_place_id: string;
+  transit_start_time: string | null;
+  has_transit_to_next: boolean;
+}
+
+export interface IItineraryOverviewDay {
+  id: number;
+  day_number: number;
+  date: string;
+  date_display: string;
+  theme: string;
+  activities: IItineraryOverviewActivity[];
+}
+
+export interface IItineraryOverview {
+  id: string;
+  status: ItineraryStatus;
+  title: string;
+  start_date: string;
+  end_date: string;
+  days: IItineraryOverviewDay[];
+}
+
+export type IOverviewDraftOperation =
+  | {
+      operation: 'add';
+      day_id: number;
+      google_place_id: string;
+      time_start: string; // HH:MM
+      time_end: string; // HH:MM
+      duration_minutes: number;
+      insert_after_order?: number;
+    }
+  | {
+      operation: 'replace';
+      activity_id: number;
+      new_google_place_id: string;
+      time_start: string; // HH:MM
+      time_end: string; // HH:MM
+      duration_minutes: number;
+    }
+  | {
+      operation: 'delete';
+      activity_id: number;
+    }
+  | {
+      operation: 'set_start_time';
+      activity_id: number;
+      time_start: string; // HH:MM
+    };
+
+export interface IApplyOverviewDraftRequest {
+  operations: IOverviewDraftOperation[];
+}
+
+export type ItineraryAdjustmentOperation = 'add' | 'replace' | 'delete' | 'batch_edit';
 export type ItineraryAdjustmentStatus = 'queued' | 'processing' | 'completed' | 'failed';
 
 export interface IItineraryAdjustmentHistoryItem {

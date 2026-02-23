@@ -37,7 +37,7 @@ const smoothStackScreenOptions = {
   headerShown: false,
   animation: 'slide_from_right' as const,
   gestureEnabled: true,
-  fullScreenGestureEnabled: true,
+  fullScreenGestureEnabled: false,
   presentation: 'card' as const,
   animationMatchesGesture: true,
 };

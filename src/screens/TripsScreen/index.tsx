@@ -8,6 +8,9 @@ import {
   RefreshControl,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Button, ActivityIndicator, Snackbar, useTheme, IconButton } from 'react-native-paper';
@@ -42,6 +45,12 @@ export default function TripsScreen() {
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const [toastMessage, setToastMessage] = React.useState<string | null>(null);
   const [generatingDotsPhase, setGeneratingDotsPhase] = React.useState(1);
+
+  React.useEffect(() => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
 
   React.useEffect(() => {
     const message = route.params?.toastMessage;
@@ -89,6 +98,15 @@ export default function TripsScreen() {
 
     return () => clearInterval(timer);
   }, [itineraries]);
+
+  const itineraryLayoutSignature = React.useMemo(
+    () => itineraries.map((item) => `${item.id}:${item.status}:${item.title}:${item.summary}`).join('|'),
+    [itineraries]
+  );
+
+  React.useEffect(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  }, [itineraryLayoutSignature]);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetY = event.nativeEvent.contentOffset.y;

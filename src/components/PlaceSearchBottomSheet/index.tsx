@@ -45,6 +45,7 @@ interface PlaceSearchBottomSheetProps {
   provinceSlug: string;
   provinceName?: string;
   mode: 'add' | 'replace';
+  editScope?: 'day' | 'overview';
   activityToReplace?: IItineraryActivity | null;
   initialAddTimeStart?: string;
   initialAddTimeEnd?: string;
@@ -196,6 +197,7 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
   provinceSlug,
   provinceName,
   mode,
+  editScope = 'day',
   activityToReplace,
   initialAddTimeStart,
   initialAddTimeEnd,
@@ -1151,7 +1153,9 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
               )}
 
               <Text variant="bodySmall" style={styles.adjustmentHintText}>
-                AI will intelligently adjust the whole day's itinerary based on this {mode === 'add' ? 'added' : 'replaced'} activity.
+                {editScope === 'overview'
+                  ? `This ${mode === 'add' ? 'addition' : 'replacement'} is saved to your overview draft. AI applies all draft edits after you tap Save in Itinerary Overview.`
+                  : `AI will intelligently adjust the whole day's itinerary based on this ${mode === 'add' ? 'added' : 'replaced'} activity.`}
               </Text>
             </ScrollView>
 

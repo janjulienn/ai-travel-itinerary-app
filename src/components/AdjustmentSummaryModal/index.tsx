@@ -11,6 +11,14 @@ interface AdjustmentSummaryModalProps {
   summary?: string;
 }
 
+type ParsedOperation = 'add' | 'replace' | 'set_start_time' | 'delete' | 'transit' | 'other';
+
+interface ParsedSummaryItem {
+  dayNumber: number | null;
+  operation: ParsedOperation;
+  text: string;
+}
+
 export const AdjustmentSummaryModal: React.FC<AdjustmentSummaryModalProps> = ({
   visible,
   onDismiss,
@@ -18,18 +26,125 @@ export const AdjustmentSummaryModal: React.FC<AdjustmentSummaryModalProps> = ({
 }) => {
   const theme = useTheme();
 
-  // Parse summary into individual change items
-  const getSummaryItems = () => {
-    if (!summary) return ['Your itinerary has been successfully updated.'];
-    
-    // Split by periods and filter out empty strings
-    const items = summary
-      .split(/\.\s+/)
-      .map(item => item.trim())
-      .filter(item => item.length > 0)
-      .map(item => item.endsWith('.') ? item : item + '.');
-    
-    return items.length > 0 ? items : [summary];
+  const to12HourText = (text: string): string => {
+    return text.replace(/\b([01]\d|2[0-3]):([0-5]\d)\b/g, (_match, h, m) => {
+      const hours = Number(h);
+      const minutes = Number(m);
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const displayHour = hours % 12 || 12;
+      return `${String(displayHour).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
+    });
+  };
+
+  const parseOperation = (text: string): ParsedOperation => {
+    const normalized = text.toLowerCase();
+
+    if (/\badd(ed)?\b/.test(normalized)) return 'add';
+    if (/\breplace(d)?\b/.test(normalized)) return 'replace';
+    if (/\b(delete|deleted|remove|removed)\b/.test(normalized)) return 'delete';
+    if (/\b(set|shift|reschedul|adjusted\s+time|time\s+updated)\b/.test(normalized)) return 'set_start_time';
+    if (/\btravel\b|\btransit\b/.test(normalized)) return 'transit';
+
+    return 'other';
+  };
+
+  const parseSummaryItems = (): ParsedSummaryItem[] => {
+    if (!summary) {
+      return [
+        {
+          dayNumber: null,
+          operation: 'other',
+          text: 'Your itinerary has been successfully updated.',
+        },
+      ];
+    }
+
+    const sentenceCandidates = summary
+      .split(/\n+|\.\s+/)
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
+      .map((item) => (item.endsWith('.') ? item : `${item}.`));
+
+    if (sentenceCandidates.length === 0) {
+      return [
+        {
+          dayNumber: null,
+          operation: 'other',
+          text: summary,
+        },
+      ];
+    }
+
+    return sentenceCandidates.map((item) => {
+      const dayMatch = item.match(/day\s*(\d+)/i);
+      const dayNumber = dayMatch ? Number(dayMatch[1]) : null;
+
+      return {
+        dayNumber,
+        operation: parseOperation(item),
+        text: to12HourText(item),
+      };
+    });
+  };
+
+  const getOperationLabel = (operation: ParsedOperation): string => {
+    switch (operation) {
+      case 'add':
+        return 'Add';
+      case 'replace':
+        return 'Replace';
+      case 'set_start_time':
+        return 'Set Time';
+      case 'delete':
+        return 'Delete';
+      case 'transit':
+        return 'Transit';
+      default:
+        return 'Other';
+    }
+  };
+
+  const groupedSummaryItems = () => {
+    const parsed = parseSummaryItems();
+    const grouped: Record<string, ParsedSummaryItem[]> = {};
+
+    parsed.forEach((item) => {
+      const key = item.dayNumber === null ? 'other' : String(item.dayNumber);
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push(item);
+    });
+
+    const operationOrder: Record<ParsedOperation, number> = {
+      add: 1,
+      replace: 2,
+      set_start_time: 3,
+      delete: 4,
+      transit: 5,
+      other: 6,
+    };
+
+    const daySections = Object.keys(grouped)
+      .filter((key) => key !== 'other')
+      .sort((a, b) => Number(a) - Number(b))
+      .map((key) => ({
+        title: `Day ${key}`,
+        items: [...grouped[key]].sort(
+          (a, b) => operationOrder[a.operation] - operationOrder[b.operation]
+        ),
+      }));
+
+    if (grouped.other && grouped.other.length > 0) {
+      daySections.push({
+        title: 'Other Changes',
+        items: [...grouped.other].sort(
+          (a, b) => operationOrder[a.operation] - operationOrder[b.operation]
+        ),
+      });
+    }
+
+    return daySections;
   };
 
   // Render text with quoted strings (place names) in bold
@@ -55,7 +170,7 @@ export const AdjustmentSummaryModal: React.FC<AdjustmentSummaryModalProps> = ({
     );
   };
 
-  const summaryItems = getSummaryItems();
+  const summarySections = groupedSummaryItems();
 
   return (
     <Portal>
@@ -87,15 +202,29 @@ export const AdjustmentSummaryModal: React.FC<AdjustmentSummaryModalProps> = ({
               Here's what changed:
             </Text>
             
-            {summaryItems.map((item, index) => (
-              <View key={index} style={styles.summaryItem}>
-                <MaterialCommunityIcons
-                  name="circle-small"
-                  size={24}
-                  color={theme.colors.primary}
-                  style={styles.bullet}
-                />
-                {renderFormattedText(item)}
+            {summarySections.map((section) => (
+              <View key={section.title} style={styles.summaryGroup}>
+                <Text variant="labelLarge" style={styles.summaryGroupTitle}>
+                  {section.title}
+                </Text>
+                {section.items.map((item, index) => (
+                  <View key={`${section.title}-${index}-${item.text}`} style={styles.summaryItem}>
+                    <MaterialCommunityIcons
+                      name="circle-small"
+                      size={24}
+                      color={theme.colors.primary}
+                      style={styles.bullet}
+                    />
+                    <View style={styles.itemContent}>
+                      <View style={[styles.operationBadge, { backgroundColor: theme.colors.secondaryContainer }]}>
+                        <Text variant="labelSmall" style={[styles.operationBadgeText, { color: theme.colors.onSecondaryContainer }]}>
+                          {getOperationLabel(item.operation)}
+                        </Text>
+                      </View>
+                      {renderFormattedText(item.text)}
+                    </View>
+                  </View>
+                ))}
               </View>
             ))}
           </ScrollView>
@@ -152,8 +281,28 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 8,
   },
+  summaryGroup: {
+    marginBottom: 10,
+  },
+  summaryGroupTitle: {
+    fontWeight: '700',
+    marginBottom: 4,
+  },
   bullet: {
     marginTop: -2,
+  },
+  itemContent: {
+    flex: 1,
+  },
+  operationBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginBottom: 4,
+  },
+  operationBadgeText: {
+    fontWeight: '700',
   },
   itemText: {
     flex: 1,

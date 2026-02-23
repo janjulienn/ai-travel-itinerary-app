@@ -4,7 +4,9 @@ import { apiClient } from './apiClient';
 import type {
   IItineraryList,
   IItineraryDetail,
+  IItineraryOverview,
   IItineraryCreateRequest,
+  IApplyOverviewDraftRequest,
   IItineraryAsyncAccepted,
   IItineraryAdjustmentAsyncAccepted,
   IActivityAddRequest,
@@ -39,6 +41,14 @@ export const itinerariesApi = {
    */
   getItinerary: async (id: string): Promise<IItineraryDetail> => {
     return apiClient.get<IItineraryDetail>(`/itineraries/${id}/`);
+  },
+
+  /**
+   * Get itinerary overview summary payload (non-transit activities)
+   * GET /itineraries/{id}/overview/
+   */
+  getItineraryOverview: async (id: string): Promise<IItineraryOverview> => {
+    return apiClient.get<IItineraryOverview>(`/itineraries/${id}/overview/`);
   },
 
   /**
@@ -79,6 +89,14 @@ export const itinerariesApi = {
    */
   deleteActivity: async (id: string, data: IActivityDeleteRequest): Promise<IItineraryAdjustmentAsyncAccepted> => {
     return apiClient.post<IItineraryAdjustmentAsyncAccepted>(`/itineraries/${id}/delete-activity/`, data);
+  },
+
+  /**
+   * Apply overview draft edits as one async batch adjustment
+   * POST /itineraries/{id}/apply-overview-draft/
+   */
+  applyOverviewDraft: async (id: string, data: IApplyOverviewDraftRequest): Promise<IItineraryAdjustmentAsyncAccepted> => {
+    return apiClient.post<IItineraryAdjustmentAsyncAccepted>(`/itineraries/${id}/apply-overview-draft/`, data);
   },
 
   /**

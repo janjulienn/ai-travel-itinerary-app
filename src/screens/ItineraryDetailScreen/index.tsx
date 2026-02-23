@@ -9,6 +9,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ErrorCard } from '../../components/common/ErrorCard';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import { ItineraryTimeline } from '../../components/ItineraryTimeline';
+import { ItineraryOverviewModal } from '../../components/ItineraryOverviewModal';
 import { AdjustmentSummaryModal } from '../../components/AdjustmentSummaryModal';
 import { useItineraryDetail } from '../../hooks/useItineraries';
 import { itinerariesApi } from '../../services/api/itineraries';
@@ -17,12 +18,15 @@ import { useApp } from '../../store/store';
 import { getStatusConfig } from '../../theme';
 import type { TripsStackParamList } from '../../types/navigation';
 import type {
+  IApplyOverviewDraftRequest,
   IActivityAddRequest,
   IActivityReplaceRequest,
   IActivityDeleteRequest,
   IItineraryAdjustmentHistoryItem,
   IItineraryDay,
+  IItineraryOverview,
 } from '../../types/dtos/itinerary';
+import type { IPlace } from '../../types/dtos/province';
 
 type RouteProps = RouteProp<TripsStackParamList, 'ItineraryDetail'>;
 const STICKY_SHOW_OFFSET = 8;
@@ -54,6 +58,10 @@ export default function ItineraryDetailScreen() {
   const [historyVisible, setHistoryVisible] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyItems, setHistoryItems] = useState<IItineraryAdjustmentHistoryItem[]>([]);
+  const [overviewVisible, setOverviewVisible] = useState(false);
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const [overviewSaving, setOverviewSaving] = useState(false);
+  const [overviewData, setOverviewData] = useState<IItineraryOverview | null>(null);
   const itineraryScrollRef = useRef<ScrollView>(null);
   const seenMarkedRef = useRef(false);
 
@@ -249,6 +257,37 @@ export default function ItineraryDetailScreen() {
     }
   };
 
+  const handleOpenOverview = async () => {
+    setOverviewVisible(true);
+    try {
+      setOverviewLoading(true);
+      const data = await itinerariesApi.getItineraryOverview(route.params.id);
+      setOverviewData(data);
+    } catch (err: any) {
+      setEditError(err.message || 'Failed to load itinerary overview');
+      setOverviewVisible(false);
+    } finally {
+      setOverviewLoading(false);
+    }
+  };
+
+  const handleSaveOverviewDraft = async (payload: IApplyOverviewDraftRequest) => {
+    try {
+      setOverviewSaving(true);
+      setEditError(null);
+      await itinerariesApi.applyOverviewDraft(route.params.id, payload);
+      setOverviewVisible(false);
+      (navigation as any).navigate('TripsTab', {
+        screen: 'Trips',
+        params: { toastMessage: 'Itinerary update is ongoing. You can check back shortly.' },
+      });
+    } catch (err: any) {
+      setEditError(err.message || 'Failed to save itinerary overview edits');
+    } finally {
+      setOverviewSaving(false);
+    }
+  };
+
   const getSummaryBullets = (summary?: string): string[] => {
     if (!summary) {
       return [];
@@ -294,6 +333,16 @@ export default function ItineraryDetailScreen() {
 
     (navigation as any).navigate('TripsTab', { screen: 'Trips' });
   };
+
+  const placeDetailsByActivityId = useMemo(() => {
+    const mapping: Record<number, IPlace | undefined> = {};
+    itinerary?.days.forEach((day) => {
+      day.activities.forEach((activity) => {
+        mapping[activity.id] = activity.place_detail;
+      });
+    });
+    return mapping;
+  }, [itinerary?.days]);
 
   if (loading && !itinerary) {
     return (
@@ -425,6 +474,15 @@ export default function ItineraryDetailScreen() {
           )}
 
           <View style={styles.headerActions}>
+            <Button
+              mode="contained-tonal"
+              icon="view-list"
+              onPress={handleOpenOverview}
+              disabled={itinerary.status !== 'ready'}
+              style={styles.overviewButton}
+            >
+              Summary
+            </Button>
             <Button
               mode="outlined"
               icon="history"
@@ -561,6 +619,19 @@ export default function ItineraryDetailScreen() {
         summary={adjustmentSummary}
       />
 
+      <ItineraryOverviewModal
+        visible={overviewVisible}
+        overview={overviewData}
+        loading={overviewLoading}
+        saving={overviewSaving}
+        countrySlug={itinerary.province_country_slug}
+        provinceSlug={itinerary.province_slug}
+        provinceName={itinerary.province_name}
+        existingPlaceDetailsByActivityId={placeDetailsByActivityId}
+        onDismiss={() => setOverviewVisible(false)}
+        onSaveDraft={handleSaveOverviewDraft}
+      />
+
       <Portal>
         <Modal
           visible={historyVisible}
@@ -677,6 +748,10 @@ const styles = StyleSheet.create({
   },
   headerActions: {
     marginTop: 12,
+    gap: 10,
+  },
+  overviewButton: {
+    marginBottom: 10,
   },
   stats: {
     flexDirection: 'row',
