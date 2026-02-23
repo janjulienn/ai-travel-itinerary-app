@@ -25,6 +25,9 @@ import { getActivityCategoryColor } from '../../theme';
 
 const MINUTES_PER_DAY = 24 * 60;
 const TIME_UPDATE_MODAL_VERTICAL_CHROME = 56;
+const MIN_DURATION_MINUTES = 15;
+const DURATION_STEP_MINUTES = 15;
+const DAY_END_MINUTES = 24 * 60 - 1;
 
 const parse12HourTimeToMinutes = (timeStr: string): number => {
   const [timePart, period] = timeStr.split(' ');
@@ -67,6 +70,32 @@ const formatTo12Hour = (hours: number, minutes: number): string => {
 
 const formatTo24Hour = (hours: number, minutes: number): string => {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
+const toTotalMinutes = ({ hours, minutes }: { hours: number; minutes: number }): number =>
+  hours * 60 + minutes;
+
+const toTimeParts = (totalMinutes: number): { hours: number; minutes: number } => ({
+  hours: Math.floor(totalMinutes / 60),
+  minutes: totalMinutes % 60,
+});
+
+const applyDurationFromStart = (
+  start: { hours: number; minutes: number },
+  proposedDuration: number
+): { end: { hours: number; minutes: number }; duration: number } => {
+  const startMinutes = toTotalMinutes(start);
+  const maxDuration = Math.max(MIN_DURATION_MINUTES, DAY_END_MINUTES - startMinutes);
+  const safeDuration = Math.max(
+    MIN_DURATION_MINUTES,
+    Math.min(proposedDuration, maxDuration)
+  );
+  const endMinutes = Math.min(startMinutes + safeDuration, DAY_END_MINUTES);
+
+  return {
+    end: toTimeParts(endMinutes),
+    duration: endMinutes - startMinutes,
+  };
 };
 
 const getCategoryIcon = (category: string): string => {
@@ -178,6 +207,8 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
   const [timeUpdateError, setTimeUpdateError] = useState<string | null>(null);
   const [timeUpdateStart, setTimeUpdateStart] = useState({ hours: 8, minutes: 0 });
   const [timeUpdateEnd, setTimeUpdateEnd] = useState({ hours: 9, minutes: 0 });
+  const [timeUpdateDuration, setTimeUpdateDuration] = useState(60);
+  const [timeUpdateMode, setTimeUpdateMode] = useState<'end_time' | 'duration'>('end_time');
   const [timeUpdateStartPickerVisible, setTimeUpdateStartPickerVisible] = useState(false);
   const [timeUpdateEndPickerVisible, setTimeUpdateEndPickerVisible] = useState(false);
   const [timeUpdateShowDetails, setTimeUpdateShowDetails] = useState(false);
@@ -380,6 +411,10 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
     setActivityBeingTimeUpdated(activity);
     setTimeUpdateStart(start);
     setTimeUpdateEnd(end);
+    const startMinutes = toTotalMinutes(start);
+    const endMinutes = toTotalMinutes(end);
+    setTimeUpdateDuration(Math.max(MIN_DURATION_MINUTES, endMinutes - startMinutes));
+    setTimeUpdateMode('end_time');
     setTimeUpdateError(null);
     setTimeUpdateShowDetails(false);
     setTimeUpdateVisible(true);
@@ -419,24 +454,30 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
 
   const handleTimeUpdateStartConfirm = ({ hours, minutes }: { hours: number; minutes: number }) => {
     setTimeUpdateStartPickerVisible(false);
-    setTimeUpdateStart({ hours, minutes });
+    const nextStart = { hours, minutes };
+    setTimeUpdateStart(nextStart);
 
-    const startMinutes = hours * 60 + minutes;
-    const currentEndMinutes = timeUpdateEnd.hours * 60 + timeUpdateEnd.minutes;
-    if (currentEndMinutes <= startMinutes) {
-      const nextRange = clampOneHourRange(startMinutes);
-      setTimeUpdateEnd({
-        hours: Math.floor(nextRange.end / 60),
-        minutes: nextRange.end % 60,
-      });
+    if (timeUpdateMode === 'duration') {
+      const computed = applyDurationFromStart(nextStart, timeUpdateDuration);
+      setTimeUpdateDuration(computed.duration);
+      setTimeUpdateEnd(computed.end);
+      return;
+    }
+
+    const nextStartMinutes = toTotalMinutes(nextStart);
+    const currentEndMinutes = toTotalMinutes(timeUpdateEnd);
+    if (currentEndMinutes <= nextStartMinutes) {
+      const computed = applyDurationFromStart(nextStart, timeUpdateDuration || 60);
+      setTimeUpdateDuration(computed.duration);
+      setTimeUpdateEnd(computed.end);
     }
   };
 
   const handleTimeUpdateEndConfirm = ({ hours, minutes }: { hours: number; minutes: number }) => {
     setTimeUpdateEndPickerVisible(false);
 
-    const endMinutes = hours * 60 + minutes;
-    const currentStartMinutes = timeUpdateStart.hours * 60 + timeUpdateStart.minutes;
+    const endMinutes = toTotalMinutes({ hours, minutes });
+    const currentStartMinutes = toTotalMinutes(timeUpdateStart);
     if (endMinutes <= currentStartMinutes) {
       setTimeUpdateError('End time must be after start time.');
       return;
@@ -444,6 +485,29 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
 
     setTimeUpdateError(null);
     setTimeUpdateEnd({ hours, minutes });
+    setTimeUpdateDuration(endMinutes - currentStartMinutes);
+  };
+
+  const handleTimeUpdateDurationAdjust = (deltaMinutes: number) => {
+    const computed = applyDurationFromStart(
+      timeUpdateStart,
+      timeUpdateDuration + deltaMinutes
+    );
+    setTimeUpdateDuration(computed.duration);
+    setTimeUpdateEnd(computed.end);
+  };
+
+  const handleTimeUpdateModeChange = (nextMode: 'end_time' | 'duration') => {
+    setTimeUpdateMode(nextMode);
+    if (nextMode === 'duration') {
+      const computed = applyDurationFromStart(
+        timeUpdateStart,
+        timeUpdateDuration || 60
+      );
+      setTimeUpdateDuration(computed.duration);
+      setTimeUpdateEnd(computed.end);
+      setTimeUpdateError(null);
+    }
   };
 
   const handleSaveTimeUpdate = async () => {
@@ -470,7 +534,7 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
         new_google_place_id: placeId,
         time_start: formatTo24Hour(timeUpdateStart.hours, timeUpdateStart.minutes),
         time_end: formatTo24Hour(timeUpdateEnd.hours, timeUpdateEnd.minutes),
-        duration_minutes: endMinutes - startMinutes,
+        duration_minutes: timeUpdateMode === 'duration' ? timeUpdateDuration : endMinutes - startMinutes,
       });
       handleDismissTimeUpdate();
     } catch (error) {
@@ -610,7 +674,7 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
                         style={styles.insertButton}
                         compact
                       >
-                        Add activity at start
+                        Add activity here
                       </Button>
                     )}
 
@@ -677,7 +741,7 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
                             style={styles.insertButton}
                             compact
                           >
-                            Add activity after
+                            Add activity here
                           </Button>
                         )}
                       </View>
@@ -874,6 +938,76 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
                 Update Activity Time
               </Text>
 
+              <View
+                style={[
+                  styles.timeUpdateModeToggle,
+                  {
+                    borderColor: theme.colors.outline,
+                    backgroundColor: theme.colors.surfaceVariant,
+                  },
+                ]}
+              >
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => handleTimeUpdateModeChange('end_time')}
+                  style={[
+                    styles.timeUpdateModeOption,
+                    timeUpdateMode === 'end_time'
+                      ? {
+                          backgroundColor: theme.colors.primary,
+                          borderColor: theme.colors.primary,
+                        }
+                      : {
+                          backgroundColor: 'transparent',
+                          borderColor: 'transparent',
+                        },
+                  ]}
+                >
+                  <Text
+                    variant="labelLarge"
+                    style={{
+                      color:
+                        timeUpdateMode === 'end_time'
+                          ? theme.colors.onPrimary
+                          : theme.colors.onSurface,
+                      fontWeight: '700',
+                    }}
+                  >
+                    End Time
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => handleTimeUpdateModeChange('duration')}
+                  style={[
+                    styles.timeUpdateModeOption,
+                    timeUpdateMode === 'duration'
+                      ? {
+                          backgroundColor: theme.colors.primary,
+                          borderColor: theme.colors.primary,
+                        }
+                      : {
+                          backgroundColor: 'transparent',
+                          borderColor: 'transparent',
+                        },
+                  ]}
+                >
+                  <Text
+                    variant="labelLarge"
+                    style={{
+                      color:
+                        timeUpdateMode === 'duration'
+                          ? theme.colors.onPrimary
+                          : theme.colors.onSurface,
+                      fontWeight: '700',
+                    }}
+                  >
+                    Duration
+                  </Text>
+                </Pressable>
+              </View>
+
               <View style={styles.timeUpdateInputRow}>
                 <View style={styles.timeUpdateInputCol}>
                   <Text variant="labelLarge">Start Time</Text>
@@ -886,16 +1020,41 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
                   </Button>
                 </View>
 
-                <View style={styles.timeUpdateInputCol}>
-                  <Text variant="labelLarge">End Time</Text>
-                  <Button
-                    mode="outlined"
-                    icon="clock-outline"
-                    onPress={() => setTimeUpdateEndPickerVisible(true)}
-                  >
-                    {formatTo12Hour(timeUpdateEnd.hours, timeUpdateEnd.minutes)}
-                  </Button>
-                </View>
+                {timeUpdateMode === 'end_time' ? (
+                  <View style={styles.timeUpdateInputCol}>
+                    <Text variant="labelLarge">End Time</Text>
+                    <Button
+                      mode="outlined"
+                      icon="clock-outline"
+                      onPress={() => setTimeUpdateEndPickerVisible(true)}
+                    >
+                      {formatTo12Hour(timeUpdateEnd.hours, timeUpdateEnd.minutes)}
+                    </Button>
+                  </View>
+                ) : (
+                  <View style={styles.timeUpdateInputCol}>
+                    <Text variant="labelLarge">Duration</Text>
+                    <View style={styles.timeUpdateDurationAdjustRow}>
+                      <Button
+                        mode="outlined"
+                        compact
+                        onPress={() => handleTimeUpdateDurationAdjust(-DURATION_STEP_MINUTES)}
+                      >
+                        -
+                      </Button>
+                      <Text variant="bodyLarge" style={styles.timeUpdateDurationAdjustValue}>
+                        {timeUpdateDuration} min
+                      </Text>
+                      <Button
+                        mode="outlined"
+                        compact
+                        onPress={() => handleTimeUpdateDurationAdjust(DURATION_STEP_MINUTES)}
+                      >
+                        +
+                      </Button>
+                    </View>
+                  </View>
+                )}
               </View>
 
               <Text variant="labelLarge" style={styles.timeUpdateSectionLabel}>
@@ -964,7 +1123,7 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
       />
 
       <TimePickerModal
-        visible={timeUpdateEndPickerVisible}
+        visible={timeUpdateEndPickerVisible && timeUpdateMode === 'end_time'}
         onDismiss={() => setTimeUpdateEndPickerVisible(false)}
         onConfirm={handleTimeUpdateEndConfirm}
         hours={timeUpdateEnd.hours}
@@ -1139,6 +1298,23 @@ const styles = StyleSheet.create({
   timeUpdateSectionTitle: {
     fontWeight: '700',
   },
+  timeUpdateModeToggle: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+  },
+  timeUpdateModeOption: {
+    flex: 1,
+    minHeight: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   timeUpdateSectionLabel: {
     marginTop: 2,
   },
@@ -1158,6 +1334,16 @@ const styles = StyleSheet.create({
   timeUpdateInputCol: {
     flex: 1,
     gap: 6,
+  },
+  timeUpdateDurationAdjustRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  timeUpdateDurationAdjustValue: {
+    minWidth: 76,
+    textAlign: 'center',
+    fontWeight: '700',
   },
   timeUpdateHintText: {
     opacity: 0.75,

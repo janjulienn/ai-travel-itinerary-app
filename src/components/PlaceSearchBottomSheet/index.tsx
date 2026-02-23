@@ -80,6 +80,10 @@ const CATEGORIES = [
   { value: 'landmark', label: 'Landmark', icon: 'bank' },
 ];
 
+const MIN_DURATION_MINUTES = 15;
+const DURATION_STEP_MINUTES = 15;
+const DAY_END_MINUTES = 24 * 60 - 1;
+
 // Convert "HH:MM" to { hours, minutes }
 const parseTime = (timeStr: string): { hours: number; minutes: number } => {
   const [hours, minutes] = timeStr.split(':').map(Number);
@@ -115,6 +119,32 @@ const formatTo12Hour = (hours: number, minutes: number): string => {
   const period = hours >= 12 ? 'PM' : 'AM';
   const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
   return `${String(displayHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
+};
+
+const toTotalMinutes = ({ hours, minutes }: { hours: number; minutes: number }): number =>
+  hours * 60 + minutes;
+
+const toTimeParts = (totalMinutes: number): { hours: number; minutes: number } => ({
+  hours: Math.floor(totalMinutes / 60),
+  minutes: totalMinutes % 60,
+});
+
+const applyDurationFromStart = (
+  start: { hours: number; minutes: number },
+  proposedDuration: number
+): { end: { hours: number; minutes: number }; duration: number } => {
+  const startMinutes = toTotalMinutes(start);
+  const maxDuration = Math.max(MIN_DURATION_MINUTES, DAY_END_MINUTES - startMinutes);
+  const safeDuration = Math.max(
+    MIN_DURATION_MINUTES,
+    Math.min(proposedDuration, maxDuration)
+  );
+  const endMinutes = Math.min(startMinutes + safeDuration, DAY_END_MINUTES);
+
+  return {
+    end: toTimeParts(endMinutes),
+    duration: endMinutes - startMinutes,
+  };
 };
 
 const toRadians = (value: number): number => (value * Math.PI) / 180;
@@ -185,6 +215,7 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
   const [timeStart, setTimeStart] = useState({ hours: 9, minutes: 0 });
   const [timeEnd, setTimeEnd] = useState({ hours: 10, minutes: 0 });
   const [duration, setDuration] = useState(60);
+  const [timeAdjustMode, setTimeAdjustMode] = useState<'end_time' | 'duration'>('end_time');
   const requestSeqRef = useRef(0);
   const animatedModalHeight = useRef(new Animated.Value(windowHeight * 0.78)).current;
 
@@ -294,6 +325,7 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
       setSelectedPlace(null);
       setShowMoreDetails(false);
       setShowInsertPreview(false);
+      setTimeAdjustMode('end_time');
       
       // Pre-fill times if replacing activity
       if (mode === 'replace' && activityToReplace) {
@@ -329,13 +361,16 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
   }, [visible, searchQuery, selectedCategories, fetchPlaces]);
 
   useEffect(() => {
-    // Calculate duration when times change
+    if (timeAdjustMode !== 'end_time') {
+      return;
+    }
+
     const startMinutes = timeStart.hours * 60 + timeStart.minutes;
     const endMinutes = timeEnd.hours * 60 + timeEnd.minutes;
     if (endMinutes > startMinutes) {
       setDuration(endMinutes - startMinutes);
     }
-  }, [timeStart, timeEnd]);
+  }, [timeStart, timeEnd, timeAdjustMode]);
 
   // Filter places based on search and category
   const filteredPlaces = useMemo(() => {
@@ -422,13 +457,55 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
   };
 
   const handleStartTimeConfirm = ({ hours, minutes }: { hours: number; minutes: number }) => {
-    setTimeStart({ hours, minutes });
+    const nextStart = { hours, minutes };
+    setTimeStart(nextStart);
+
+    if (timeAdjustMode === 'duration') {
+      const computed = applyDurationFromStart(nextStart, duration);
+      setDuration(computed.duration);
+      setTimeEnd(computed.end);
+    } else {
+      const nextStartMinutes = toTotalMinutes(nextStart);
+      const currentEndMinutes = toTotalMinutes(timeEnd);
+      if (currentEndMinutes <= nextStartMinutes) {
+        const computed = applyDurationFromStart(nextStart, duration || 60);
+        setDuration(computed.duration);
+        setTimeEnd(computed.end);
+      }
+    }
+
     setStartTimePickerVisible(false);
   };
 
   const handleEndTimeConfirm = ({ hours, minutes }: { hours: number; minutes: number }) => {
-    setTimeEnd({ hours, minutes });
+    const nextEnd = { hours, minutes };
+    const startMinutes = toTotalMinutes(timeStart);
+    const endMinutes = toTotalMinutes(nextEnd);
+    if (endMinutes <= startMinutes) {
+      return;
+    }
+
+    setTimeEnd(nextEnd);
+    setDuration(endMinutes - startMinutes);
     setEndTimePickerVisible(false);
+  };
+
+  const handleDurationAdjust = (deltaMinutes: number) => {
+    const computed = applyDurationFromStart(
+      timeStart,
+      duration + deltaMinutes
+    );
+    setDuration(computed.duration);
+    setTimeEnd(computed.end);
+  };
+
+  const handleTimeAdjustModeChange = (nextMode: 'end_time' | 'duration') => {
+    setTimeAdjustMode(nextMode);
+    if (nextMode === 'duration') {
+      const computed = applyDurationFromStart(timeStart, duration || 60);
+      setDuration(computed.duration);
+      setTimeEnd(computed.end);
+    }
   };
 
   const getCategoryIcon = (category: string) => {
@@ -669,20 +746,55 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                     <Text variant="labelLarge" style={styles.selectionSummaryTitle}>
                       Replacing activity
                     </Text>
-                    {activityToReplace?.place_detail?.google_maps_url ? (
-                      <Pressable onPress={() => openGoogleMaps(activityToReplace.place_detail?.google_maps_url)}>
-                        <Text variant="bodyMedium" style={styles.selectionFromLink} numberOfLines={2}>
-                          {activityToReplace.location_name || activityToReplace.title}
-                        </Text>
+                    {!!activityToReplace?.place_detail?.google_maps_url ? (
+                      <Pressable
+                        onPress={() => openGoogleMaps(activityToReplace.place_detail?.google_maps_url)}
+                        hitSlop={6}
+                      >
+                        <View style={styles.selectionSummaryPlaceRow}>
+                          <MaterialCommunityIcons
+                            name={getCategoryIcon(activityToReplace?.place_detail?.category || '') as any}
+                            size={22}
+                            color={theme.colors.primary}
+                          />
+                          <View style={styles.selectionSummaryPlaceTextWrap}>
+                            <Text
+                              variant="bodyMedium"
+                              style={[styles.selectionToText, styles.selectionFromLink]}
+                              numberOfLines={2}
+                            >
+                              {activityToReplace?.location_name || activityToReplace?.title || 'Current activity'}
+                            </Text>
+                            {!!(activityToReplace?.location_address || activityToReplace?.place_detail?.address) && (
+                              <Text variant="bodySmall" style={styles.selectionSummaryAddress} numberOfLines={2}>
+                                {activityToReplace?.location_address || activityToReplace?.place_detail?.address}
+                              </Text>
+                            )}
+                          </View>
+                        </View>
                       </Pressable>
                     ) : (
-                      <Text variant="bodyMedium" style={styles.selectionFromText} numberOfLines={2}>
-                        {activityToReplace?.location_name || activityToReplace?.title || 'Current activity'}
-                      </Text>
+                      <View style={styles.selectionSummaryPlaceRow}>
+                        <MaterialCommunityIcons
+                          name={getCategoryIcon(activityToReplace?.place_detail?.category || '') as any}
+                          size={22}
+                          color={theme.colors.primary}
+                        />
+                        <View style={styles.selectionSummaryPlaceTextWrap}>
+                          <Text variant="bodyMedium" style={styles.selectionToText} numberOfLines={2}>
+                            {activityToReplace?.location_name || activityToReplace?.title || 'Current activity'}
+                          </Text>
+                          {!!(activityToReplace?.location_address || activityToReplace?.place_detail?.address) && (
+                            <Text variant="bodySmall" style={styles.selectionSummaryAddress} numberOfLines={2}>
+                              {activityToReplace?.location_address || activityToReplace?.place_detail?.address}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
                     )}
 
                     <View style={styles.selectionArrowRow}>
-                      <MaterialCommunityIcons name="swap-vertical" size={16} color={theme.colors.primary} />
+                      <MaterialCommunityIcons name="swap-vertical" size={22} color={theme.colors.primary} />
                     </View>
                     <View style={styles.selectionSummaryPlaceRow}>
                       <MaterialCommunityIcons
@@ -825,6 +937,76 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                 Set Activity Time
               </Text>
 
+              <View
+                style={[
+                  styles.timeModeToggle,
+                  {
+                    borderColor: theme.colors.outline,
+                    backgroundColor: theme.colors.surfaceVariant,
+                  },
+                ]}
+              >
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => handleTimeAdjustModeChange('end_time')}
+                  style={[
+                    styles.timeModeToggleOption,
+                    timeAdjustMode === 'end_time'
+                      ? {
+                          backgroundColor: theme.colors.primary,
+                          borderColor: theme.colors.primary,
+                        }
+                      : {
+                          backgroundColor: 'transparent',
+                          borderColor: 'transparent',
+                        },
+                  ]}
+                >
+                  <Text
+                    variant="labelLarge"
+                    style={{
+                      color:
+                        timeAdjustMode === 'end_time'
+                          ? theme.colors.onPrimary
+                          : theme.colors.onSurface,
+                      fontWeight: '700',
+                    }}
+                  >
+                    End Time
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => handleTimeAdjustModeChange('duration')}
+                  style={[
+                    styles.timeModeToggleOption,
+                    timeAdjustMode === 'duration'
+                      ? {
+                          backgroundColor: theme.colors.primary,
+                          borderColor: theme.colors.primary,
+                        }
+                      : {
+                          backgroundColor: 'transparent',
+                          borderColor: 'transparent',
+                        },
+                  ]}
+                >
+                  <Text
+                    variant="labelLarge"
+                    style={{
+                      color:
+                        timeAdjustMode === 'duration'
+                          ? theme.colors.onPrimary
+                          : theme.colors.onSurface,
+                      fontWeight: '700',
+                    }}
+                  >
+                    Duration
+                  </Text>
+                </Pressable>
+              </View>
+
               <View style={styles.timeInputs}>
                 <View style={styles.timeInputContainer}>
                   <Text variant="labelLarge">Start Time</Text>
@@ -838,17 +1020,42 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
                   </Button>
                 </View>
 
-                <View style={styles.timeInputContainer}>
-                  <Text variant="labelLarge">End Time</Text>
-                  <Button
-                    mode="outlined"
-                    onPress={() => setEndTimePickerVisible(true)}
-                    style={styles.timePickerButton}
-                    icon="clock-outline"
-                  >
-                    {formatTo12Hour(timeEnd.hours, timeEnd.minutes)}
-                  </Button>
-                </View>
+                {timeAdjustMode === 'end_time' ? (
+                  <View style={styles.timeInputContainer}>
+                    <Text variant="labelLarge">End Time</Text>
+                    <Button
+                      mode="outlined"
+                      onPress={() => setEndTimePickerVisible(true)}
+                      style={styles.timePickerButton}
+                      icon="clock-outline"
+                    >
+                      {formatTo12Hour(timeEnd.hours, timeEnd.minutes)}
+                    </Button>
+                  </View>
+                ) : (
+                  <View style={styles.timeInputContainer}>
+                    <Text variant="labelLarge">Duration</Text>
+                    <View style={styles.durationAdjustRow}>
+                      <Button
+                        mode="outlined"
+                        compact
+                        onPress={() => handleDurationAdjust(-DURATION_STEP_MINUTES)}
+                      >
+                        -
+                      </Button>
+                      <Text variant="bodyLarge" style={styles.durationAdjustValue}>
+                        {duration} min
+                      </Text>
+                      <Button
+                        mode="outlined"
+                        compact
+                        onPress={() => handleDurationAdjust(DURATION_STEP_MINUTES)}
+                      >
+                        +
+                      </Button>
+                    </View>
+                  </View>
+                )}
               </View>
 
               <View style={[styles.durationInfo, { backgroundColor: theme.colors.secondaryContainer }]}> 
@@ -964,7 +1171,7 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
       />
 
       <TimePickerModal
-        visible={endTimePickerVisible}
+        visible={endTimePickerVisible && timeAdjustMode === 'end_time'}
         onDismiss={() => setEndTimePickerVisible(false)}
         onConfirm={handleEndTimeConfirm}
         hours={timeEnd.hours}
@@ -1040,12 +1247,11 @@ const styles = StyleSheet.create({
   },
   selectionFromLink: {
     textDecorationLine: 'underline',
-    fontWeight: '600',
-  },
-  selectionFromText: {
-    fontWeight: '600',
   },
   selectionArrowRow: {
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 4,
     marginBottom: 2,
   },
@@ -1185,8 +1391,25 @@ const styles = StyleSheet.create({
   },
   timeSectionTitle: {
     fontWeight: 'bold',
-    marginBottom: 16,
+    marginBottom: 10,
     marginTop: 8,
+  },
+  timeModeToggle: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
+  timeModeToggleOption: {
+    flex: 1,
+    minHeight: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   insertPreviewToggleWrap: {
     marginBottom: 10,
@@ -1203,6 +1426,17 @@ const styles = StyleSheet.create({
   },
   timeInputContainer: {
     flex: 1,
+  },
+  durationAdjustRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  durationAdjustValue: {
+    fontWeight: '700',
+    minWidth: 76,
+    textAlign: 'center',
   },
   timePickerButton: {
     marginTop: 8,
