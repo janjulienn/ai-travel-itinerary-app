@@ -6,7 +6,7 @@ export type ActivityCategory =
   | 'breakfast' 
   | 'lunch' 
   | 'dinner' 
-  | 'merienda' 
+  | 'snack' 
   | 'food_trip' 
   | 'sightseeing' 
   | 'activity' 

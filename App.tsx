@@ -3,12 +3,13 @@ import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { Platform, View, useColorScheme } from 'react-native';
 import { PaperProvider, Portal, useTheme } from 'react-native-paper';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer, DefaultTheme as NavigationDefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { en, registerTranslation } from 'react-native-paper-dates';
+import { hasAndroidBottomNavigationBar } from './src/constants';
 
 // Providers
 import { AppProvider, useApp } from './src/store/store';
@@ -130,9 +131,14 @@ function ProfileStackScreen() {
 function AppContent() {
   const colorScheme = useColorScheme();
   const { state } = useApp();
+  const insets = useSafeAreaInsets();
   const isDarkMode = state.themeMode === 'system' ? colorScheme === 'dark' : state.themeMode === 'dark';
   const activeTheme = isDarkMode ? darkTheme : lightTheme;
   const activeNavigationTheme = isDarkMode ? navigationThemes.dark : navigationThemes.light;
+  const tabBarPaddingTop = 8;
+  const hasAndroidBottomNavigationBarVisible = hasAndroidBottomNavigationBar(insets.bottom);
+  const tabBarPaddingBottom = hasAndroidBottomNavigationBarVisible ? Math.max(insets.bottom, 12) : 12;
+  const tabBarHeight = hasAndroidBottomNavigationBarVisible ? 70 + Math.max(insets.bottom - 12, 0) : 70;
 
   const appNavigationTheme = {
     ...activeNavigationTheme,
@@ -164,9 +170,9 @@ function AppContent() {
                   tabBarInactiveTintColor: activeTheme.colors.onSurfaceVariant,
                   tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
                   tabBarStyle: {
-                    height: 70,
-                    paddingBottom: 12,
-                    paddingTop: 8,
+                    height: tabBarHeight,
+                    paddingBottom: tabBarPaddingBottom,
+                    paddingTop: tabBarPaddingTop,
                     backgroundColor: activeTheme.colors.surface,
                     borderTopColor: activeTheme.colors.outlineVariant,
                   },

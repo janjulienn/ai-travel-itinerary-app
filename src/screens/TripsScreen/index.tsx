@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Button, ActivityIndicator, Snackbar, useTheme, IconButton } from 'react-native-paper';
 import { useNavigation, useFocusEffect, useRoute, RouteProp } from '@react-navigation/native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AxiosError } from 'axios';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -27,6 +28,7 @@ import { useApp } from '../../store/store';
 import { itinerariesApi } from '../../services/api/itineraries';
 import type { IItineraryList } from '../../types/dtos/itinerary';
 import { TripsStackParamList } from '../../types/navigation';
+import { hasAndroidBottomNavigationBar } from '../../constants';
 
 type NavigationProp = NativeStackNavigationProp<TripsStackParamList>;
 type TripsRouteProp = RouteProp<TripsStackParamList, 'Trips'>;
@@ -38,6 +40,8 @@ export default function TripsScreen() {
   const { state } = useApp();
   const { itineraries, loading, error, refresh } = useItineraries();
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
+  const hasAndroidBottomNavigationBarVisible = hasAndroidBottomNavigationBar(insets.bottom);
   const [showPullToRefreshHint, setShowPullToRefreshHint] = React.useState(false);
   const [isPullRefreshing, setIsPullRefreshing] = React.useState(false);
   const [itineraryToDelete, setItineraryToDelete] = React.useState<IItineraryList | null>(null);
@@ -285,7 +289,13 @@ export default function TripsScreen() {
             generatingDotsPhase={generatingDotsPhase}
           />
         )}
-        contentContainerStyle={[styles.list, { paddingTop: insets.top + 56 }]}
+        contentContainerStyle={[
+          styles.list,
+          {
+            paddingTop: insets.top + 56,
+            paddingBottom: hasAndroidBottomNavigationBarVisible ? tabBarHeight + 12 : undefined,
+          },
+        ]}
         ListHeaderComponent={
           isPullRefreshing && itineraries.length > 0 ? (
             <View style={styles.listLoadingContainer}>

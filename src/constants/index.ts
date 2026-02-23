@@ -1,6 +1,10 @@
 // Application constants
 
+import { Platform } from 'react-native';
 import type { ActivityCategory, BudgetRange, Pace, GroupType } from '../types/dtos/itinerary';
+
+export const hasAndroidBottomNavigationBar = (bottomInset: number): boolean =>
+  Platform.OS === 'android' && bottomInset > 0;
 
 // API Configuration
 export const API_BASE_URL = 'http://192.168.68.62:8000/api/v1';
@@ -20,7 +24,7 @@ export const ACTIVITY_CATEGORIES: Record<
   breakfast: { icon: 'coffee', label: 'Breakfast', color: '#FF9800' },
   lunch: { icon: 'food', label: 'Lunch', color: '#FF5722' },
   dinner: { icon: 'silverware-fork-knife', label: 'Dinner', color: '#F44336' },
-  merienda: { icon: 'cookie', label: 'Merienda', color: '#FFC107' },
+  snack: { icon: 'cookie', label: 'Snack', color: '#FFC107' },
   food_trip: { icon: 'food-variant', label: 'Food Trip', color: '#F57C00' },
   sightseeing: { icon: 'camera', label: 'Sightseeing', color: '#2196F3' },
   activity: { icon: 'run', label: 'Activity', color: '#4CAF50' },

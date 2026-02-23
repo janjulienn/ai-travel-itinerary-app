@@ -11,10 +11,12 @@ import {
   Pressable,
   Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Searchbar,ActivityIndicator, useTheme } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { hasAndroidBottomNavigationBar } from '../../constants';
 import { ErrorCard } from '../../components/common/ErrorCard';
 import { useCountries } from '../../hooks/useProvinces';
 import type { HomeStackParamList } from '../../types/navigation';
@@ -24,6 +26,9 @@ type NavigationProp = NativeStackNavigationProp<HomeStackParamList>;
 export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp>();
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
+  const hasAndroidBottomNavigationBarVisible = hasAndroidBottomNavigationBar(insets.bottom);
   const { countries, loading, error, refresh } = useCountries();
   const [searchQuery, setSearchQuery] = React.useState('');
   const [showPullToRefreshHint, setShowPullToRefreshHint] = React.useState(false);
@@ -124,7 +129,10 @@ export default function HomeScreen() {
           </Pressable>
         )}
         numColumns={1}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[
+          styles.list,
+          hasAndroidBottomNavigationBarVisible ? { paddingBottom: tabBarHeight + 12 } : null,
+        ]}
         onScroll={handleScroll}
         onScrollEndDrag={() => setShowPullToRefreshHint(false)}
         onMomentumScrollEnd={() => setShowPullToRefreshHint(false)}

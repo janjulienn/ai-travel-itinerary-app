@@ -1,10 +1,11 @@
 // Itinerary detail screen - full day-by-day itinerary
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Card, Chip, Button, ActivityIndicator, useTheme, Portal, Modal, IconButton } from 'react-native-paper';
 import { useRoute, RouteProp, useNavigation, useIsFocused } from '@react-navigation/native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ErrorCard } from '../../components/common/ErrorCard';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
@@ -16,6 +17,7 @@ import { itinerariesApi } from '../../services/api/itineraries';
 import { addPendingItinerary } from '../../services/pendingItineraries';
 import { useApp } from '../../store/store';
 import { getStatusConfig } from '../../theme';
+import { hasAndroidBottomNavigationBar } from '../../constants';
 import type { TripsStackParamList } from '../../types/navigation';
 import type {
   IApplyOverviewDraftRequest,
@@ -42,6 +44,8 @@ export default function ItineraryDetailScreen() {
   const theme = useTheme();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
+  const hasAndroidBottomNavigationBarVisible = hasAndroidBottomNavigationBar(insets.bottom);
   const { itinerary, loading, error, refresh } = useItineraryDetail(route.params.id);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -423,6 +427,7 @@ export default function ItineraryDetailScreen() {
     <ScrollView
       ref={itineraryScrollRef}
       style={[styles.container, { backgroundColor: theme.colors.background }]}
+      contentContainerStyle={{ paddingBottom: hasAndroidBottomNavigationBarVisible ? tabBarHeight + 16 : undefined }}
       onScroll={(event) => setScrollY(event.nativeEvent.contentOffset.y)}
       scrollEventThrottle={16}
     >

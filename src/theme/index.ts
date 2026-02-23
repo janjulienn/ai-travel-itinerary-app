@@ -169,7 +169,7 @@ const activityCategoryColorMap: Record<ActivityCategory, ActivityCategoryColorTo
   breakfast: 'tertiary',
   lunch: 'tertiary',
   dinner: 'tertiary',
-  merienda: 'tertiary',
+  snack: 'tertiary',
   food_trip: 'tertiary',
   sightseeing: 'primary',
   activity: 'secondary',

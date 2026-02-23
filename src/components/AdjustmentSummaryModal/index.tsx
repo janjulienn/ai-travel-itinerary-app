@@ -48,6 +48,18 @@ export const AdjustmentSummaryModal: React.FC<AdjustmentSummaryModalProps> = ({
     return 'other';
   };
 
+  const stripLeadingChangePrefix = (text: string): string => {
+    let cleaned = text.trim();
+
+    cleaned = cleaned.replace(/^day\s*\d+\s*:\s*/i, '');
+    cleaned = cleaned.replace(
+      /^(add|replace|set\s*start\s*time|set\s*time|delete|transit|other)\s*:\s*/i,
+      ''
+    );
+
+    return cleaned.trim();
+  };
+
   const parseSummaryItems = (): ParsedSummaryItem[] => {
     if (!summary) {
       return [
@@ -78,11 +90,12 @@ export const AdjustmentSummaryModal: React.FC<AdjustmentSummaryModalProps> = ({
     return sentenceCandidates.map((item) => {
       const dayMatch = item.match(/day\s*(\d+)/i);
       const dayNumber = dayMatch ? Number(dayMatch[1]) : null;
+      const cleanedText = stripLeadingChangePrefix(item);
 
       return {
         dayNumber,
         operation: parseOperation(item),
-        text: to12HourText(item),
+        text: to12HourText(cleanedText || item),
       };
     });
   };
