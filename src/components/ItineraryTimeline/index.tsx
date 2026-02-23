@@ -9,6 +9,8 @@ import {
   Linking,
   Pressable,
   Image,
+  Animated,
+  Easing,
   useWindowDimensions,
 } from 'react-native';
 import { List, Text, Divider, useTheme, Button, Portal, Modal } from 'react-native-paper';
@@ -28,6 +30,7 @@ const TIME_UPDATE_MODAL_VERTICAL_CHROME = 56;
 const MIN_DURATION_MINUTES = 15;
 const DURATION_STEP_MINUTES = 15;
 const DAY_END_MINUTES = 24 * 60 - 1;
+const MODAL_RESIZE_ANIMATION_MS = 220;
 
 const parse12HourTimeToMinutes = (timeStr: string): number => {
   const [timePart, period] = timeStr.split(' ');
@@ -96,6 +99,21 @@ const applyDurationFromStart = (
     end: toTimeParts(endMinutes),
     duration: endMinutes - startMinutes,
   };
+};
+
+const formatDurationHumanReadable = (totalMinutes: number): string => {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours === 0) {
+    return `${minutes} min`;
+  }
+
+  if (minutes === 0) {
+    return `${hours} ${hours === 1 ? 'hr' : 'hrs'}`;
+  }
+
+  return `${hours} ${hours === 1 ? 'hr' : 'hrs'} ${minutes} min`;
 };
 
 const getCategoryIcon = (category: string): string => {
@@ -233,6 +251,20 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
     timeUpdateActionHeight > 0 &&
     timeUpdateContentHeight > 0 &&
     timeUpdateTotalContentHeight > timeUpdateModalMaxHeight;
+  const timeUpdateAnimatedHeight = useRef(new Animated.Value(timeUpdateFallbackHeight)).current;
+  const timeUpdateTargetHeight = timeUpdateMeasuredHeight;
+
+  useEffect(() => {
+    Animated.timing(timeUpdateAnimatedHeight, {
+      toValue: timeUpdateTargetHeight,
+      duration: MODAL_RESIZE_ANIMATION_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [
+    timeUpdateTargetHeight,
+    timeUpdateAnimatedHeight,
+  ]);
 
   const exitEditMode = () => {
     setEditingDayId(null);
@@ -798,10 +830,10 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
           onDismiss={handleDismissTimeUpdate}
           contentContainerStyle={styles.timeUpdateModalContainer}
         >
-          <View
+          <Animated.View
             style={[
               styles.timeUpdateModalContent,
-              { backgroundColor: theme.colors.surface, height: timeUpdateMeasuredHeight },
+              { backgroundColor: theme.colors.surface, height: timeUpdateAnimatedHeight },
             ]}
           >
             <View onLayout={(event) => setTimeUpdateHeaderHeight(event.nativeEvent.layout.height)}>
@@ -1057,6 +1089,18 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
                 )}
               </View>
 
+              <View
+                style={[
+                  styles.timeUpdateDurationInfo,
+                  { backgroundColor: theme.colors.secondaryContainer },
+                ]}
+              >
+                <MaterialCommunityIcons name="clock-outline" size={20} color={theme.colors.primary} />
+                <Text variant="bodyLarge" style={styles.timeUpdateDurationText}>
+                  Duration: {formatDurationHumanReadable(timeUpdateDuration)}
+                </Text>
+              </View>
+
               <Text variant="labelLarge" style={styles.timeUpdateSectionLabel}>
                 Time Update Preview
               </Text>
@@ -1106,7 +1150,7 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
                 Save
               </Button>
             </View>
-          </View>
+          </Animated.View>
         </Modal>
       </Portal>
 
@@ -1344,6 +1388,17 @@ const styles = StyleSheet.create({
     minWidth: 76,
     textAlign: 'center',
     fontWeight: '700',
+  },
+  timeUpdateDurationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  timeUpdateDurationText: {
+    marginLeft: 8,
+    fontWeight: '500',
   },
   timeUpdateHintText: {
     opacity: 0.75,

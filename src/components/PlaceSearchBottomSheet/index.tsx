@@ -83,6 +83,7 @@ const CATEGORIES = [
 const MIN_DURATION_MINUTES = 15;
 const DURATION_STEP_MINUTES = 15;
 const DAY_END_MINUTES = 24 * 60 - 1;
+const MODAL_RESIZE_ANIMATION_MS = 220;
 
 // Convert "HH:MM" to { hours, minutes }
 const parseTime = (timeStr: string): { hours: number; minutes: number } => {
@@ -145,6 +146,21 @@ const applyDurationFromStart = (
     end: toTimeParts(endMinutes),
     duration: endMinutes - startMinutes,
   };
+};
+
+const formatDurationHumanReadable = (totalMinutes: number): string => {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours === 0) {
+    return `${minutes} min`;
+  }
+
+  if (minutes === 0) {
+    return `${hours} ${hours === 1 ? 'hr' : 'hrs'}`;
+  }
+
+  return `${hours} ${hours === 1 ? 'hr' : 'hrs'} ${minutes} min`;
 };
 
 const toRadians = (value: number): number => (value * Math.PI) / 180;
@@ -565,7 +581,7 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
   useEffect(() => {
     Animated.timing(animatedModalHeight, {
       toValue: targetModalHeight,
-      duration: 220,
+      duration: MODAL_RESIZE_ANIMATION_MS,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
@@ -1061,7 +1077,7 @@ export const PlaceSearchBottomSheet: React.FC<PlaceSearchBottomSheetProps> = ({
               <View style={[styles.durationInfo, { backgroundColor: theme.colors.secondaryContainer }]}> 
                 <MaterialCommunityIcons name="clock-outline" size={20} color={theme.colors.primary} />
                 <Text variant="bodyLarge" style={styles.durationText}>
-                  Duration: {duration} minutes ({Math.floor(duration / 60)}h {duration % 60}m)
+                  Duration: {formatDurationHumanReadable(duration)}
                 </Text>
               </View>
 
